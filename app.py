@@ -99,6 +99,10 @@ if not df.empty:
 
 with st.sidebar:
     st.divider()
+    if db.is_postgres():
+        st.caption("🐘 Storage: **Postgres** — persistent, shared community database ✅")
+    else:
+        st.caption("💾 Storage: SQLite (local / resets on restart)")
     with st.expander("ℹ️ About baskwise"):
         st.caption(
             "baskwise turns your receipts into a real, local price database and "
