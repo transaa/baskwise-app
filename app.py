@@ -12,7 +12,8 @@ from pricewise import db
 from pricewise.location import (
     AREA, CITY, REGION, TIER_ORDER, is_nearby, location_label, place_str,
 )
-from pricewise.ocr import image_to_text, ocr_available
+from pricewise.ocr import image_to_text_with_confidence, ocr_available
+from pricewise.quality import assess as assess_quality
 from pricewise.parser import parse_receipt
 from pricewise.freshness import is_stale, label as freshness_label
 from pricewise.insights import staple_inflation
@@ -630,6 +631,7 @@ with tab_add:
 
     text = ""
     img_bytes = None
+    ocr_conf = None
 
     if mode == "📷 Take a photo":
         st.info(
@@ -659,7 +661,15 @@ with tab_add:
 
     if img_bytes is not None:
         with st.spinner("📖 Reading your receipt…"):
-            ocr_text = image_to_text(img_bytes)
+            ocr_text, ocr_conf = image_to_text_with_confidence(img_bytes)
+        if ocr_conf is not None:
+            tone = "🟢" if ocr_conf >= 80 else ("🟡" if ocr_conf >= 60 else "🔴")
+            st.caption(f"{tone} OCR read confidence: **{ocr_conf:.0f}%**")
+            if ocr_conf < 60:
+                st.warning(
+                    "Low read confidence — the photo may be blurry, dim, or cut off. "
+                    "A clearer picture gives more accurate prices. Check the text below carefully."
+                )
         st.text_area(
             "Here's what we read — fix any typos before saving:",
             value=ocr_text, height=200, key="ocr_text",
@@ -678,15 +688,24 @@ with tab_add:
             f"**Total:** ${parsed.computed_total:.2f}"
         )
 
-        # --- quality check: a receipt is only trustworthy if we know WHEN it's from ---
-        st.markdown("**🔎 Quality check**")
-        q1, q2, q3 = st.columns(3)
-        q1.markdown(
-            f"📅 Date: {'✅ ' + parsed.purchased_on if parsed.has_date else '❌ missing'}"
-            + (f"  🕐 {parsed.time}" if parsed.time else "")
-        )
-        q2.markdown(f"🏬 Store: {'✅ ' + parsed.store if parsed.store != 'Unknown Store' else '⚠️ unknown'}")
-        q3.markdown(f"🧾 Items: {'✅ ' + str(len(parsed.items)) if parsed.items else '❌ none'}")
+        # --- quality check: accuracy gate before data enters the database ---
+        report = assess_quality(parsed, ocr_conf)
+        grade_badge = {
+            "high": "🟢 High confidence — looks accurate",
+            "medium": "🟡 Review recommended",
+            "low": "🔴 Needs attention before saving",
+        }[report["grade"]]
+        st.markdown(f"**🔎 Quality check — {grade_badge}**")
+        for c in report["checks"]:
+            icon = {True: "✅", False: "❌", None: "➖"}[c.ok]
+            detail = c.detail.replace("$", "\\$")  # avoid markdown treating $..$ as LaTeX
+            st.markdown(f"{icon} **{c.label}:** {detail}")
+        if report["reconciled"] is False:
+            st.warning(
+                "The item prices don't add up to the receipt's total — likely an "
+                "OCR misread. Please fix the numbers above so the data stays accurate "
+                "for everyone."
+            )
 
         # Date is MANDATORY — without it we can't tell if prices are current, and
         # we won't feed others a false "fresh" price.

@@ -66,23 +66,54 @@ def ocr_available() -> tuple[bool, str]:
     return True, "ready"
 
 
-def image_to_text(file_or_bytes) -> str:
-    """OCR an image (path, file-like, or bytes) into text. Raises if unavailable."""
+# Receipts are a single tall column of text → PSM 4 ("single column of text of
+# variable sizes") reads them more accurately than the default.
+_OCR_CONFIG = "--psm 4"
+
+
+def _prep(file_or_bytes):
+    """Open + preprocess an image for accurate receipt OCR."""
     import io
 
-    import pytesseract
-    from PIL import Image
-
-    _configure()
+    from PIL import Image, ImageOps, ImageFilter
 
     if isinstance(file_or_bytes, (bytes, bytearray)):
         img = Image.open(io.BytesIO(file_or_bytes))
     else:
         img = Image.open(file_or_bytes)
 
-    # Light preprocessing helps receipt OCR: grayscale + upscale small images.
-    img = img.convert("L")
-    if img.width < 1000:
-        scale = 1000 / img.width
-        img = img.resize((1000, int(img.height * scale)))
-    return pytesseract.image_to_string(img)
+    img = ImageOps.exif_transpose(img)        # respect phone orientation
+    img = img.convert("L")                     # grayscale
+    if img.width < 1400:                        # upscale small/low-res photos
+        scale = 1400 / img.width
+        img = img.resize((1400, int(img.height * scale)))
+    img = ImageOps.autocontrast(img)           # normalize lighting
+    img = img.filter(ImageFilter.SHARPEN)      # crisp the text edges
+    return img
+
+
+def image_to_text(file_or_bytes) -> str:
+    """OCR an image (path, file-like, or bytes) into text. Raises if unavailable."""
+    import pytesseract
+
+    _configure()
+    return pytesseract.image_to_string(_prep(file_or_bytes), config=_OCR_CONFIG)
+
+
+def image_to_text_with_confidence(file_or_bytes) -> tuple[str, float | None]:
+    """OCR plus a mean word-confidence (0-100), the OCR engine's own accuracy
+    estimate. Returns (text, confidence) — confidence is None if unavailable."""
+    import pytesseract
+
+    _configure()
+    img = _prep(file_or_bytes)
+    text = pytesseract.image_to_string(img, config=_OCR_CONFIG)
+    try:
+        data = pytesseract.image_to_data(
+            img, config=_OCR_CONFIG, output_type=pytesseract.Output.DICT
+        )
+        confs = [float(c) for c in data.get("conf", []) if str(c).strip() not in ("", "-1")]
+        confidence = round(sum(confs) / len(confs), 1) if confs else None
+    except Exception:
+        confidence = None
+    return text, confidence

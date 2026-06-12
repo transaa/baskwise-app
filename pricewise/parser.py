@@ -95,6 +95,8 @@ class ParsedReceipt:
     state: str = ""
     zip: str = ""
     time: str = ""  # HH:MM (24h) if a purchase time is on the receipt
+    subtotal: float | None = None
+    tax: float | None = None
     items: list[ParsedItem] = field(default_factory=list)
 
     @property
@@ -219,19 +221,32 @@ def parse_receipt(text: str) -> ParsedReceipt:
     city, state, zipc = _detect_location(lines)
 
     declared_total: float | None = None
+    subtotal: float | None = None
+    tax: float | None = None
     items: list[ParsedItem] = []
 
     for ln in lines:
         low = ln.lower()
+        low_ns = low.replace(" ", "")
         price_match = _PRICE_RE.search(ln)
 
-        # Capture a declared total separately (don't treat as an item).
-        if price_match and ("total" in low and "subtotal" not in low):
+        # Capture subtotal / tax / total separately (don't treat as items) —
+        # these power the totals-reconciliation accuracy check.
+        if price_match:
             try:
-                declared_total = float(price_match.group(1))
+                val = float(price_match.group(1))
             except ValueError:
-                pass
-            continue
+                val = None
+            if val is not None:
+                if "subtotal" in low_ns:
+                    subtotal = val
+                    continue
+                if re.search(r"\btax\b", low):
+                    tax = val
+                    continue
+                if "total" in low_ns:
+                    declared_total = val
+                    continue
 
         if _is_skippable(ln) or not price_match:
             continue
@@ -297,5 +312,7 @@ def parse_receipt(text: str) -> ParsedReceipt:
         state=state,
         zip=zipc,
         time=time,
+        subtotal=subtotal,
+        tax=tax,
         items=items,
     )
