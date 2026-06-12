@@ -39,6 +39,7 @@ def seed_from_samples(db_path: str = db.DB_PATH, sample_dir: str = SAMPLE_DIR) -
                 city=parsed.city,
                 state=parsed.state,
                 zip=parsed.zip,
+                purchased_time=parsed.time,
             )
             added += 1
     return added

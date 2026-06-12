@@ -94,11 +94,42 @@ class ParsedReceipt:
     city: str = ""
     state: str = ""
     zip: str = ""
+    time: str = ""  # HH:MM (24h) if a purchase time is on the receipt
     items: list[ParsedItem] = field(default_factory=list)
 
     @property
     def computed_total(self) -> float:
         return round(sum(i.line_total for i in self.items), 2)
+
+    @property
+    def has_date(self) -> bool:
+        return bool(self.purchased_on)
+
+
+# Purchase time: "14:32", "2:32 PM", "02:32:11 pm". Colon distinguishes it from
+# prices (which use a dot). Captured for accuracy/ordering when present.
+_TIME_RE = re.compile(
+    r"\b(\d{1,2}):(\d{2})(?::\d{2})?\s*([AaPp][Mm])?\b"
+)
+
+
+def _detect_time(text: str) -> str:
+    """Return purchase time as HH:MM (24h), or '' if none found."""
+    for m in _TIME_RE.finditer(text):
+        hh, mm, ap = int(m.group(1)), int(m.group(2)), m.group(3)
+        if mm > 59:
+            continue
+        if ap:
+            ap = ap.lower()
+            if hh < 1 or hh > 12:
+                continue
+            if ap == "pm" and hh != 12:
+                hh += 12
+            elif ap == "am" and hh == 12:
+                hh = 0
+        if 0 <= hh <= 23:
+            return f"{hh:02d}:{mm:02d}"
+    return ""
 
 
 def _detect_store(lines: list[str]) -> str:
@@ -184,6 +215,7 @@ def parse_receipt(text: str) -> ParsedReceipt:
 
     store = _detect_store(lines)
     date = _detect_date(text)
+    time = _detect_time(text)
     city, state, zipc = _detect_location(lines)
 
     declared_total: float | None = None
@@ -264,5 +296,6 @@ def parse_receipt(text: str) -> ParsedReceipt:
         city=city,
         state=state,
         zip=zipc,
+        time=time,
         items=items,
     )

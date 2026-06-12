@@ -669,25 +669,60 @@ with tab_add:
     if text.strip():
         parsed = parse_receipt(text)
         place = ", ".join(x for x in [parsed.city, parsed.state] if x)
+        when = parsed.purchased_on + (f" {parsed.time}" if parsed.time else "")
         st.markdown(
             f"**Store:** {parsed.store}  |  "
             f"**Where:** {place or 'unknown'} {parsed.zip}  |  "
-            f"**Date:** {parsed.purchased_on or 'unknown'}  |  "
+            f"**When:** {when or 'unknown'}  |  "
             f"**Items:** {len(parsed.items)}  |  "
             f"**Total:** ${parsed.computed_total:.2f}"
         )
+
+        # --- quality check: a receipt is only trustworthy if we know WHEN it's from ---
+        st.markdown("**🔎 Quality check**")
+        q1, q2, q3 = st.columns(3)
+        q1.markdown(
+            f"📅 Date: {'✅ ' + parsed.purchased_on if parsed.has_date else '❌ missing'}"
+            + (f"  🕐 {parsed.time}" if parsed.time else "")
+        )
+        q2.markdown(f"🏬 Store: {'✅ ' + parsed.store if parsed.store != 'Unknown Store' else '⚠️ unknown'}")
+        q3.markdown(f"🧾 Items: {'✅ ' + str(len(parsed.items)) if parsed.items else '❌ none'}")
+
+        # Date is MANDATORY — without it we can't tell if prices are current, and
+        # we won't feed others a false "fresh" price.
+        save_date = parsed.purchased_on
+        if not parsed.has_date:
+            st.error(
+                "📅 **No date found on this receipt — and the date is required.** "
+                "Without it we can't tell whether these prices are current, and we "
+                "won't show other shoppers a false 'fresh' price. Please enter the "
+                "**exact date printed on the receipt** (not today, unless that's when "
+                "you bought it)."
+            )
+            picked_date = st.date_input("Purchase date (from the receipt)", value=None)
+            save_date = picked_date.isoformat() if picked_date else ""
+            st.caption(
+                "💡 Tip: receipts with the date cut off can carry very old prices — "
+                "best to re-photograph with the date visible."
+            )
+
         if parsed.items:
             preview = pd.DataFrame([vars(i) for i in parsed.items])[
                 ["name", "category", "qty", "unit_price", "line_total", "upc"]
             ]
             st.dataframe(preview, use_container_width=True, hide_index=True)
 
-            if st.button("💾 Save to my journal", type="primary"):
+            can_save = bool(save_date)
+            if not can_save:
+                st.button("💾 Save to my journal", type="primary", disabled=True,
+                          help="Enter the receipt's date first — it's required.")
+                st.caption("⛔ Add the purchase date above to enable saving.")
+            elif st.button("💾 Save to my journal", type="primary"):
                 with db.session() as conn:
                     db.insert_receipt(
                         conn,
                         store=parsed.store,
-                        purchased_on=parsed.purchased_on or "1970-01-01",
+                        purchased_on=save_date,
                         total=parsed.total
                         if parsed.total is not None
                         else parsed.computed_total,
@@ -696,6 +731,7 @@ with tab_add:
                         city=parsed.city,
                         state=parsed.state,
                         zip=parsed.zip,
+                        purchased_time=parsed.time,
                     )
                 refresh()
                 st.session_state.pop("ocr_text", None)

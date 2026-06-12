@@ -21,7 +21,8 @@ CREATE TABLE IF NOT EXISTS receipts (
     city         TEXT,
     state        TEXT,
     zip          TEXT,
-    purchased_on TEXT NOT NULL,          -- ISO date (YYYY-MM-DD)
+    purchased_on TEXT NOT NULL,          -- ISO date (YYYY-MM-DD) — required
+    purchased_time TEXT,                 -- HH:MM (24h) if on the receipt
     total        REAL,
     source_file  TEXT,
     created_at   TEXT NOT NULL DEFAULT (datetime('now'))
@@ -86,6 +87,10 @@ def get_connection(db_path: str = DB_PATH) -> sqlite3.Connection:
 def init_db(db_path: str = DB_PATH) -> None:
     with get_connection(db_path) as conn:
         conn.executescript(SCHEMA)
+        # Migration for older DBs that predate the purchased_time column.
+        cols = {r["name"] for r in conn.execute("PRAGMA table_info(receipts)")}
+        if "purchased_time" not in cols:
+            conn.execute("ALTER TABLE receipts ADD COLUMN purchased_time TEXT")
         conn.commit()
 
 
@@ -110,12 +115,14 @@ def insert_receipt(
     city: str | None = None,
     state: str | None = None,
     zip: str | None = None,
+    purchased_time: str | None = None,
 ) -> int:
     """Insert one receipt and its line items. Returns the new receipt id."""
     cur = conn.execute(
-        "INSERT INTO receipts (store, city, state, zip, purchased_on, total, source_file) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?)",
-        (store, city, state, zip, purchased_on, total, source_file),
+        "INSERT INTO receipts "
+        "(store, city, state, zip, purchased_on, purchased_time, total, source_file) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        (store, city, state, zip, purchased_on, purchased_time, total, source_file),
     )
     receipt_id = int(cur.lastrowid)
     for it in items:
