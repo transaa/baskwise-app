@@ -602,49 +602,76 @@ with tab_basket:
 # --- Add Receipt -----------------------------------------------------------
 
 with tab_add:
-    st.subheader("Add a receipt")
-    st.caption("Your data, voluntarily shared — no scraping, no store permissions needed.")
+    st.subheader("📸 Add a receipt to your journal")
+    st.caption(
+        "Snap it — baskwise reads every item, price, store, and date. It's saved "
+        "to **your grocery journal**, and the facts (item · price · store · date) "
+        "join the **community price database** that powers savings for everyone. "
+        "Every receipt makes it smarter — for you and for all shoppers."
+    )
 
     ok, reason = ocr_available()
     mode = st.radio(
-        "Input method",
-        ["Paste text", "Upload photo (OCR)"],
+        "How do you want to add it?",
+        ["📷 Take a photo", "📁 Upload a photo", "📝 Paste text"],
         horizontal=True,
     )
 
     text = ""
-    if mode == "Paste text":
+    img_bytes = None
+
+    if mode == "📷 Take a photo":
+        st.info(
+            "📋 **For a clean read:** lay the receipt flat, good lighting, and fit "
+            "the **whole** receipt in frame — top to bottom, nothing cut off."
+        )
+        if not ok:
+            st.warning(f"Photo reading isn't available here: {reason}")
+        shot = st.camera_input("Point at your receipt and snap", disabled=not ok)
+        if shot is not None and ok:
+            img_bytes = shot.getvalue()
+
+    elif mode == "📁 Upload a photo":
+        st.caption("Already have a photo? Upload it here.")
+        if not ok:
+            st.warning(f"Photo reading isn't available here: {reason}")
+        up = st.file_uploader("Receipt photo", type=["png", "jpg", "jpeg"], disabled=not ok)
+        if up is not None and ok:
+            img_bytes = up.getvalue()
+
+    else:
         text = st.text_area(
             "Paste the receipt text",
             height=220,
-            placeholder="Walmart Supercenter\n06/01/2026\nMILK 1GAL  3.46\nEGGS 12CT  3.28\n...",
+            placeholder="Walmart Supercenter\nDallas, TX 75201\n06/01/2026\nMILK 1GAL  3.46\nEGGS 12CT  3.28\n...",
         )
-    else:
-        if not ok:
-            st.warning(f"Photo OCR unavailable: {reason}")
-            st.caption("You can still paste text above. To enable photos, see requirements.txt.")
-        up = st.file_uploader("Receipt photo", type=["png", "jpg", "jpeg"], disabled=not ok)
-        if up is not None and ok:
-            with st.spinner("Reading image…"):
-                text = image_to_text(up.getvalue())
-            st.text_area("OCR result (edit if needed)", value=text, height=220, key="ocr_text")
-            text = st.session_state.get("ocr_text", text)
+
+    if img_bytes is not None:
+        with st.spinner("📖 Reading your receipt…"):
+            ocr_text = image_to_text(img_bytes)
+        st.text_area(
+            "Here's what we read — fix any typos before saving:",
+            value=ocr_text, height=200, key="ocr_text",
+        )
+        text = st.session_state.get("ocr_text", ocr_text)
 
     if text.strip():
         parsed = parse_receipt(text)
+        place = ", ".join(x for x in [parsed.city, parsed.state] if x)
         st.markdown(
-            f"**Detected store:** {parsed.store}  |  "
+            f"**Store:** {parsed.store}  |  "
+            f"**Where:** {place or 'unknown'} {parsed.zip}  |  "
             f"**Date:** {parsed.purchased_on or 'unknown'}  |  "
             f"**Items:** {len(parsed.items)}  |  "
-            f"**Computed total:** ${parsed.computed_total:.2f}"
+            f"**Total:** ${parsed.computed_total:.2f}"
         )
         if parsed.items:
             preview = pd.DataFrame([vars(i) for i in parsed.items])[
                 ["name", "category", "qty", "unit_price", "line_total", "upc"]
             ]
-            st.dataframe(preview, use_container_width=True)
+            st.dataframe(preview, use_container_width=True, hide_index=True)
 
-            if st.button("💾 Save this receipt", type="primary"):
+            if st.button("💾 Save to my journal", type="primary"):
                 with db.session() as conn:
                     db.insert_receipt(
                         conn,
@@ -655,12 +682,24 @@ with tab_add:
                         else parsed.computed_total,
                         source_file=None,
                         items=[vars(i) for i in parsed.items],
+                        city=parsed.city,
+                        state=parsed.state,
+                        zip=parsed.zip,
                     )
                 refresh()
-                st.success("Saved! Switch tabs to see it reflected.")
+                st.session_state.pop("ocr_text", None)
+                st.success(
+                    "✅ Saved to your journal — and added to the community price "
+                    "database. Thanks for making baskwise smarter for everyone! "
+                    "Check the **Savings Finder** and **Overview** tabs."
+                )
+                st.balloons()
                 st.rerun()
         else:
-            st.warning("No line items detected. Check the text formatting.")
+            st.warning(
+                "No line items detected. If this was a photo, edit the text above "
+                "to fix any misreads, or try a clearer picture."
+            )
 
     with st.expander("⚙️ Admin"):
         st.caption("Reset wipes all data and reloads the bundled samples.")
