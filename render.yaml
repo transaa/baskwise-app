@@ -1,0 +1,9 @@
+# Render Blueprint — auto-configures the service when you connect this repo.
+# Render → New → Blueprint → pick this repo → Apply.
+services:
+  - type: web
+    name: baskwise
+    runtime: docker
+    plan: free
+    autoDeploy: true
+    healthCheckPath: /_stcore/health
