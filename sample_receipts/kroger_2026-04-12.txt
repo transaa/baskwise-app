@@ -1,0 +1,20 @@
+Kroger
+1450 Market St
+Dallas, TX 75201
+04/12/2026
+
+2% MILK GALLON            3.59
+KROGER WHITE BREAD        1.49
+GRADE A LARGE EGGS        3.19
+BANANAS 1.80LB @ 0.65     1.17
+BONELESS CHICKEN BREAST   8.76
+SHARP CHEDDAR CHEESE      4.49
+JASMINE RICE 5LB          5.29
+PAPER TOWELS 6 ROLL      10.49
+HONEY 12OZ                4.99
+ORGANIC SPINACH           3.49
+SUBTOTAL                 46.94
+TAX                       1.31
+TOTAL                    48.25
+DEBIT                    48.25
+THANK YOU

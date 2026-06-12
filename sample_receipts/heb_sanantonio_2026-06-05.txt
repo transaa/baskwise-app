@@ -1,0 +1,14 @@
+H-E-B
+San Antonio, TX 78205
+06/05/2026
+
+DIET COKE 12PK 0049000028911    6.97
+PRINGLES ORIG 0038000138416     1.67
+NUTELLA 13OZ 3017620422003      3.79
+MILK GALLON               3.12
+LARGE EGGS 12CT           2.99
+COFFEE GROUND 12OZ        6.79
+SUBTOTAL                 25.33
+TAX                       0.71
+TOTAL                    26.04
+DEBIT                    26.04

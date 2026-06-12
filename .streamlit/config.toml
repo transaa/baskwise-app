@@ -1,0 +1,10 @@
+# baskwise brand theme
+[theme]
+primaryColor = "#1f8a4c"
+backgroundColor = "#ffffff"
+secondaryBackgroundColor = "#f6faf7"
+textColor = "#16241c"
+font = "sans serif"
+
+[server]
+headless = true

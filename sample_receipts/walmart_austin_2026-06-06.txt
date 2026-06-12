@@ -1,0 +1,14 @@
+Walmart Supercenter
+Austin, TX 78701
+06/06/2026
+
+DIET COKE 12PK 0049000028911    6.88
+PRINGLES ORIG 0038000138416     1.72
+NUTELLA 13OZ 3017620422003      3.88
+GREAT VALUE MILK 1GAL     3.29
+LARGE EGGS 12CT           3.18
+COFFEE GROUND 12OZ        6.94
+SUBTOTAL                 25.89
+TAX                       0.73
+TOTAL                    26.62
+VISA                     26.62

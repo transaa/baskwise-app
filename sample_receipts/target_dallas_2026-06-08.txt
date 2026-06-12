@@ -1,0 +1,15 @@
+Target
+Dallas, TX 75201
+06/08/2026
+
+DIET COKE 12PK 0049000028911    7.29
+PRINGLES ORIG 0038000138416     1.99
+NUTELLA 13OZ 3017620422003      4.19
+2% MILK GALLON            3.55
+LARGE EGGS 12CT           3.39
+COFFEE GROUND 12OZ        7.29
+WHITE BREAD               1.45
+SUBTOTAL                 29.15
+TAX                       0.82
+TOTAL                    29.97
+DEBIT                    29.97

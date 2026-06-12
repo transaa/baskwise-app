@@ -1,0 +1,20 @@
+# Generated database (re-created/seeded on first run — never commit it)
+pricewise.db
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# Streamlit secrets (never commit)
+.streamlit/secrets.toml
+
+# Local dev / editor config
+.claude/
+
+# Local dev helpers / temp files
+landing/_*.py
+landing/_*.txt
+*.log

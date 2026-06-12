@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>baskwise — Stop overpaying for groceries</title>
+<meta name="description" content="Snap your receipts. baskwise turns them into a real price database and shows you which store near you is cheapest — so you save money on every trip." />
+<meta property="og:title" content="baskwise — Stop overpaying for groceries" />
+<meta property="og:description" content="Snap your receipts. See which store near you is cheapest. Save money on every trip." />
+<meta property="og:type" content="website" />
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>%F0%9F%A7%BA</text></svg>" />
+<style>
+  :root {
+    --green: #1f8a4c;
+    --green-dark: #156b3a;
+    --green-soft: #e8f6ee;
+    --ink: #16241c;
+    --muted: #5b6b61;
+    --bg: #ffffff;
+    --bg-alt: #f6faf7;
+    --border: #dfeae3;
+    --radius: 14px;
+    --shadow: 0 10px 30px rgba(18, 80, 45, 0.08);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color: var(--ink);
+    background: var(--bg);
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: inherit; text-decoration: none; }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 0 24px; }
+
+  /* Header */
+  header {
+    position: sticky; top: 0; z-index: 50;
+    background: rgba(255,255,255,0.85);
+    backdrop-filter: saturate(180%) blur(10px);
+    border-bottom: 1px solid var(--border);
+  }
+  .nav { display: flex; align-items: center; justify-content: space-between; height: 68px; }
+  .logo { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 22px; letter-spacing: -0.5px; }
+  .logo .mark { font-size: 26px; }
+  .nav-cta { display: flex; align-items: center; gap: 22px; }
+  .nav-links a { color: var(--muted); font-weight: 600; font-size: 15px; }
+  .nav-links a:hover { color: var(--ink); }
+  @media (max-width: 640px) { .nav-links { display: none; } }
+
+  .btn {
+    display: inline-block; font-weight: 700; font-size: 15px;
+    padding: 11px 20px; border-radius: 999px; cursor: pointer; border: none;
+    transition: transform .06s ease, box-shadow .2s ease, background .2s ease;
+  }
+  .btn-primary { background: var(--green); color: #fff; box-shadow: var(--shadow); }
+  .btn-primary:hover { background: var(--green-dark); transform: translateY(-1px); }
+  .btn-ghost { background: var(--green-soft); color: var(--green-dark); }
+  .btn-ghost:hover { background: #d8efe1; }
+  .btn-lg { font-size: 17px; padding: 15px 28px; }
+
+  /* Hero */
+  .hero { padding: 86px 0 64px; text-align: center; background:
+      radial-gradient(900px 400px at 50% -120px, var(--green-soft), transparent); }
+  .badge {
+    display: inline-block; background: var(--green-soft); color: var(--green-dark);
+    font-weight: 700; font-size: 13px; padding: 6px 14px; border-radius: 999px; margin-bottom: 22px;
+  }
+  .hero h1 { font-size: clamp(34px, 6vw, 58px); line-height: 1.05; letter-spacing: -1.5px; font-weight: 850; }
+  .hero h1 .hl { color: var(--green); }
+  .hero p.sub { font-size: clamp(17px, 2.4vw, 21px); color: var(--muted); max-width: 640px; margin: 22px auto 0; }
+
+  .signup { display: flex; gap: 10px; justify-content: center; margin: 34px auto 14px; max-width: 480px; flex-wrap: wrap; }
+  .signup input {
+    flex: 1 1 240px; min-width: 0; padding: 14px 18px; font-size: 16px;
+    border: 1.5px solid var(--border); border-radius: 999px; outline: none;
+  }
+  .signup input:focus { border-color: var(--green); }
+  .fineprint { font-size: 13px; color: var(--muted); }
+  .formmsg { font-size: 15px; font-weight: 600; color: var(--green-dark); min-height: 22px; margin-top: 8px; }
+
+  /* Sections */
+  section.block { padding: 72px 0; }
+  section.alt { background: var(--bg-alt); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+  .eyebrow { text-align: center; color: var(--green); font-weight: 800; letter-spacing: .8px; text-transform: uppercase; font-size: 13px; }
+  .h2 { text-align: center; font-size: clamp(26px, 4vw, 38px); letter-spacing: -0.8px; font-weight: 800; margin: 10px auto 0; max-width: 720px; }
+  .lead { text-align: center; color: var(--muted); max-width: 640px; margin: 14px auto 0; font-size: 17px; }
+
+  .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 22px; margin-top: 48px; }
+  .step { background: #fff; border: 1px solid var(--border); border-radius: var(--radius); padding: 28px; }
+  .step .num { display: inline-grid; place-items: center; width: 38px; height: 38px; border-radius: 10px;
+    background: var(--green-soft); color: var(--green-dark); font-weight: 800; margin-bottom: 16px; }
+  .step h3 { font-size: 19px; margin-bottom: 6px; }
+  .step p { color: var(--muted); font-size: 15.5px; }
+
+  .features { display: grid; grid-template-columns: repeat(2, 1fr); gap: 22px; margin-top: 48px; }
+  .feature { display: flex; gap: 16px; background: #fff; border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; }
+  .feature .ic { font-size: 28px; line-height: 1; }
+  .feature h3 { font-size: 18px; margin-bottom: 4px; }
+  .feature p { color: var(--muted); font-size: 15px; }
+
+  @media (max-width: 760px) { .steps, .features { grid-template-columns: 1fr; } }
+
+  /* Why */
+  .why { max-width: 760px; margin: 40px auto 0; }
+  .why .row { display: flex; gap: 14px; padding: 16px 0; border-bottom: 1px dashed var(--border); }
+  .why .row:last-child { border-bottom: none; }
+  .why .ic { color: var(--green); font-weight: 800; font-size: 20px; }
+  .why h4 { font-size: 17px; }
+  .why p { color: var(--muted); font-size: 15.5px; }
+
+  /* CTA */
+  .cta { text-align: center; }
+  .cta .panel { background: linear-gradient(135deg, var(--green), var(--green-dark)); color: #fff;
+    border-radius: 22px; padding: 56px 28px; box-shadow: var(--shadow); }
+  .cta h2 { font-size: clamp(26px, 4vw, 36px); letter-spacing: -0.6px; }
+  .cta p { opacity: .92; margin-top: 10px; font-size: 18px; }
+  .cta .signup input { border-color: transparent; }
+  .cta .fineprint { color: rgba(255,255,255,.85); }
+  .cta .formmsg { color: #eafff2; }
+
+  footer { padding: 40px 0 56px; color: var(--muted); font-size: 14px; }
+  .foot { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; }
+  .foot a { color: var(--green-dark); font-weight: 600; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap nav">
+    <div class="logo"><span class="mark">🧺</span> baskwise</div>
+    <div class="nav-cta">
+      <span class="nav-links">
+        <a href="#how">How it works</a>
+        <a href="#features">Features</a>
+        <a href="#why">Why baskwise</a>
+      </span>
+      <a class="btn btn-primary" href="#get">Get early access</a>
+    </div>
+  </div>
+</header>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="wrap">
+    <span class="badge">🛒 Early access — be first in your city</span>
+    <h1>Stop overpaying<br>for <span class="hl">groceries.</span></h1>
+    <p class="sub">
+      Snap a photo of your receipt. baskwise turns it into a real price database and
+      shows you which store <strong>near you</strong> is cheapest — so you save money on every trip.
+    </p>
+
+    <form class="signup" id="form-top" name="waitlist" method="POST"
+          data-netlify="true" netlify-honeypot="bot-field"
+          onsubmit="return handleSignup(event,'msg-top')">
+      <input type="hidden" name="form-name" value="waitlist" />
+      <p hidden><label>Don't fill this out: <input name="bot-field" /></label></p>
+      <input type="email" name="email" placeholder="you@email.com" required aria-label="Email address" />
+      <button class="btn btn-primary" type="submit">Get early access</button>
+    </form>
+    <div class="formmsg" id="msg-top"></div>
+    <p class="fineprint">Free to join. No spam — just an invite when we launch in your area.</p>
+  </div>
+</section>
+
+<!-- HOW IT WORKS -->
+<section class="block alt" id="how">
+  <div class="wrap">
+    <p class="eyebrow">How it works</p>
+    <h2 class="h2">Three taps to a cheaper grocery bill</h2>
+    <p class="lead">No price-hunting across a dozen apps. Your receipts do the work.</p>
+    <div class="steps">
+      <div class="step">
+        <div class="num">1</div>
+        <h3>📸 Snap your receipt</h3>
+        <p>Take a photo after you shop. baskwise reads every item, price, store, and date automatically.</p>
+      </div>
+      <div class="step">
+        <div class="num">2</div>
+        <h3>🧠 We do the math</h3>
+        <p>Each item is matched across stores by barcode. We compare it to real prices logged near you.</p>
+      </div>
+      <div class="step">
+        <div class="num">3</div>
+        <h3>💰 See where to save</h3>
+        <p>Get a simple plan: "buy these here, those there." Same groceries, smaller total.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FEATURES -->
+<section class="block" id="features">
+  <div class="wrap">
+    <p class="eyebrow">What you get</p>
+    <h2 class="h2">A money-saving sidekick for every shopping trip</h2>
+    <div class="features">
+      <div class="feature">
+        <div class="ic">💰</div>
+        <div><h3>Savings Finder</h3><p>See exactly how much you could've saved on any trip, item by item, with a buy-here/buy-there plan.</p></div>
+      </div>
+      <div class="feature">
+        <div class="ic">🔍</div>
+        <div><h3>Barcode price check</h3><p>Scan any product and instantly see every store's price for that exact item — cheapest first.</p></div>
+      </div>
+      <div class="feature">
+        <div class="ic">📍</div>
+        <div><h3>Prices near you</h3><p>Rankings are based on stores you can actually drive to — not the cheapest price in the country.</p></div>
+      </div>
+      <div class="feature">
+        <div class="ic">📈</div>
+        <div><h3>Price history</h3><p>Watch staples like milk and eggs over time, and catch when "your" store quietly raises prices.</p></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- WHY -->
+<section class="block alt" id="why">
+  <div class="wrap">
+    <p class="eyebrow">Why baskwise</p>
+    <h2 class="h2">Built around real shoppers, not retailer ads</h2>
+    <div class="why">
+      <div class="row"><div class="ic">✓</div><div><h4>Powered by real receipts</h4><p>Prices come from actual purchases by real people — the most honest price data there is, and it gets better as the community grows.</p></div></div>
+      <div class="row"><div class="ic">✓</div><div><h4>Your data stays yours</h4><p>We only keep the facts — item, price, store, date. No names, no card numbers. You're always in control.</p></div></div>
+      <div class="row"><div class="ic">✓</div><div><h4>Local and fair</h4><p>baskwise shows the best deal you can reach, in your city, today — not an out-of-stock price three states away.</p></div></div>
+      <div class="row"><div class="ic">✓</div><div><h4>Free to start</h4><p>Track spending and find savings for free. Simple, fair pricing for power features — no surprises.</p></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="block cta" id="get">
+  <div class="wrap">
+    <div class="panel">
+      <h2>Be first to save in your neighborhood</h2>
+      <p>Join the early-access list and we'll invite you the moment baskwise covers your area.</p>
+      <form class="signup" id="form-bottom" name="waitlist" method="POST"
+            data-netlify="true" netlify-honeypot="bot-field"
+            onsubmit="return handleSignup(event,'msg-bottom')">
+        <input type="hidden" name="form-name" value="waitlist" />
+        <p hidden><label>Don't fill this out: <input name="bot-field" /></label></p>
+        <input type="email" name="email" placeholder="you@email.com" required aria-label="Email address" />
+        <button class="btn btn-ghost btn-lg" type="submit">Get early access</button>
+      </form>
+      <div class="formmsg" id="msg-bottom"></div>
+      <p class="fineprint">Free. Unsubscribe anytime.</p>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap foot">
+    <div class="logo"><span class="mark">🧺</span> baskwise</div>
+    <div>© 2026 baskwise · <a href="https://baskwise.app">baskwise.app</a> · Save smarter, every trip.</div>
+  </div>
+</footer>
+
+<script>
+  // Submits to Netlify Forms (captured automatically once deployed on Netlify),
+  // while keeping the inline confirmation instead of a full-page redirect.
+  // Also keeps a local backup copy so nothing is lost if the network blips.
+  function encode(data) {
+    return Object.keys(data)
+      .map(function (k) { return encodeURIComponent(k) + '=' + encodeURIComponent(data[k]); })
+      .join('&');
+  }
+
+  function handleSignup(e, msgId) {
+    e.preventDefault();
+    var form = e.target;
+    var input = form.querySelector('input[type=email]');
+    var msg = document.getElementById(msgId);
+    var email = (input.value || '').trim();
+    if (!email) return false;
+
+    // Local backup (belt and suspenders).
+    try {
+      var list = JSON.parse(localStorage.getItem('baskwise_waitlist') || '[]');
+      if (list.indexOf(email) === -1) list.push(email);
+      localStorage.setItem('baskwise_waitlist', JSON.stringify(list));
+    } catch (_) {}
+
+    // Post to Netlify Forms. On Netlify this is recorded under Forms → "waitlist".
+    // Locally (no Netlify backend) it harmlessly fails and we still confirm.
+    var done = function () {
+      msg.textContent = "🎉 You're on the list! We'll be in touch.";
+      input.value = '';
+    };
+    fetch('/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: encode({ 'form-name': 'waitlist', 'email': email }),
+    }).then(done).catch(done);
+
+    return false;
+  }
+</script>
+
+</body>
+</html>

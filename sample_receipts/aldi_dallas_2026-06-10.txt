@@ -1,0 +1,15 @@
+Aldi
+Dallas, TX 75204
+06/10/2026
+
+DIET COKE 12PK 0049000028911    6.49
+PRINGLES ORIG 0038000138416     1.49
+MILK GALLON               2.98
+LARGE EGGS 12CT           2.79
+WHITE BREAD               1.09
+BANANAS 2.0LB @ 0.44      0.88
+COFFEE GROUND 12OZ        6.49
+SUBTOTAL                 22.21
+TAX                       0.62
+TOTAL                    22.83
+DEBIT                    22.83

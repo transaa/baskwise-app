@@ -1,0 +1,8 @@
+# baskwise app dependencies (Streamlit Community Cloud installs these)
+streamlit>=1.33
+pandas>=2.0
+
+# Photo-receipt OCR. The Tesseract *binary* is installed via packages.txt
+# (tesseract-ocr); these are the Python bindings.
+pytesseract>=0.3.10
+Pillow>=10.0
