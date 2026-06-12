@@ -7,6 +7,8 @@ barcode datasets (Open Food Facts category trees) and/or an ML classifier.
 
 from __future__ import annotations
 
+from .textmatch import any_term_in_text
+
 # Order matters: earlier categories win on the first keyword hit. Non-food
 # categories and strong-signal words (juice, coffee) are checked BEFORE the
 # broad produce/meat lists, because single words like "orange" (orange juice)
@@ -40,8 +42,8 @@ TAXONOMY: list[tuple[str, tuple[str, ...]]] = [
         "salmon", "tuna", "shrimp", "fish", "steak", "ground beef", "ribs",
     )),
     ("Dairy & Eggs", (
-        "milk", "cheese", "yogurt", "butter", "egg", "cream", "sour crm",
-        "cottage", "half & half", "creamer", "cheddar",
+        "milk", "buttermilk", "cheese", "yogurt", "butter", "egg", "cream",
+        "sour crm", "cottage", "half & half", "creamer", "cheddar",
     )),
     ("Bakery", (
         "bread", "bagel", "bun", "tortilla", "muffin", "cake",
@@ -49,13 +51,13 @@ TAXONOMY: list[tuple[str, tuple[str, ...]]] = [
     )),
     ("Produce", (
         "banana", "apple", "lettuce", "romaine", "tomato", "onion", "potato",
-        "carrot", "spinach", "broccoli", "pepper", "avocado", "grape", "berr",
+        "carrot", "spinach", "broccoli", "pepper", "avocado", "grape", "berry",
         "lemon", "lime", "orange", "cucumber", "celery", "mushroom", "garlic",
-        "salad",
+        "salad", "eggplant", "melon", "watermelon", "cantaloupe", "kale",
     )),
     ("Snacks & Candy", (
         "chip", "crisp", "pringles", "cracker", "cookie", "candy", "chocolate",
-        "popcorn", "pretzel", "nuts", "granola", "snack",
+        "popcorn", "pretzel", "nuts", "granola", "snack", "licorice",
     )),
     ("Pantry", (
         "rice", "pasta", "flour", "sugar", "oil", "cereal", "soup", "sauce",
@@ -68,12 +70,14 @@ DEFAULT_CATEGORY = "Other"
 
 
 def categorize(name: str) -> str:
-    """Return the best-guess category for a (normalized or raw) item name."""
-    text = name.lower()
+    """Return the best-guess category for a (normalized or raw) item name.
+
+    Uses whole-word, plural-aware matching so keywords don't false-match inside
+    other words ("tea" in "steak", "egg" in "eggplant", "water" in "watermelon").
+    """
     for category, keywords in TAXONOMY:
-        for kw in keywords:
-            if kw in text:
-                return category
+        if any_term_in_text(name, keywords):
+            return category
     return DEFAULT_CATEGORY
 
 

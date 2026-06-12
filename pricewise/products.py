@@ -9,6 +9,8 @@ across stores. Anything that doesn't match falls back to token-based matching.
 
 from __future__ import annotations
 
+from .textmatch import term_in_text
+
 # (canonical display name, canonical key, keyword phrases). Checked top to bottom;
 # put more specific phrases first so "orange juice" beats "orange".
 STAPLES: list[tuple[str, str, tuple[str, ...]]] = [
@@ -32,10 +34,11 @@ STAPLES: list[tuple[str, str, tuple[str, ...]]] = [
 
 
 def match_staple(raw_name: str) -> tuple[str, str] | None:
-    """Return (canonical_name, canonical_key) if the item is a known staple."""
-    text = raw_name.lower()
+    """Return (canonical_name, canonical_key) if the item is a known staple.
+
+    Whole-word matching avoids false hits like "milk" inside "buttermilk".
+    """
     for name, key, phrases in STAPLES:
-        for phrase in phrases:
-            if phrase in text:
-                return name, key
+        if any(term_in_text(raw_name, phrase) for phrase in phrases):
+            return name, key
     return None

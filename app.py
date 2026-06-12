@@ -95,6 +95,16 @@ if not df.empty:
             "🗺️ same state = your region"
         )
 
+with st.sidebar:
+    st.divider()
+    with st.expander("ℹ️ About baskwise"):
+        st.caption(
+            "baskwise turns your receipts into a real, local price database and "
+            "shows you where to shop to save — built around real shoppers, not "
+            "retailer ads.\n\n"
+            "🌐 [baskwise.com](https://baskwise.com) · 📱 [baskwise.app](https://baskwise.app)"
+        )
+
 if df.empty:
     st.warning("No data yet. Add a receipt in the **Add Receipt** tab.")
 
@@ -660,3 +670,10 @@ with tab_add:
             refresh()
             st.success("Database reset to sample data.")
             st.rerun()
+
+
+# --- Footer (renders once, below the tabs) ---------------------------------
+st.divider()
+fcol1, fcol2 = st.columns([3, 1])
+fcol1.caption("🧺 **baskwise** — save smarter, every trip.")
+fcol2.caption("[baskwise.app](https://baskwise.app)")
