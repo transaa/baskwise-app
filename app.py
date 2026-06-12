@@ -16,6 +16,7 @@ from pricewise.ocr import image_to_text_with_confidence, ocr_available
 from pricewise.quality import assess as assess_quality
 from pricewise.parser import parse_receipt
 from pricewise.freshness import is_stale, label as freshness_label
+from pricewise import geo
 from pricewise.insights import staple_inflation
 from pricewise.savings import analyze_receipt, top_opportunities
 from pricewise.seed import ensure_seeded
@@ -101,6 +102,11 @@ def resolve_upc_cached(upc: str):
     return resolve_upc(upc)
 
 
+@st.cache_data(ttl=86400)
+def resolve_zip(zip_code: str):
+    return geo.zip_to_place(zip_code)
+
+
 def refresh() -> None:
     load_items.clear()
 
@@ -144,31 +150,31 @@ if added:
 df = load_items()
 
 # --- home location (powers all "near you" comparisons) ---------------------
+# Type any US ZIP → city/state auto-populate. Default to the area with the most
+# data so the demo opens on a populated location.
 home_zip, home_state, home_city = "", "", ""
+default_zip = ""
 if not df.empty:
-    # Order locations by how much data each has, so the default home is the
-    # user's main shopping area (the most-seen ZIP), not an arbitrary one.
-    by_zip = df.dropna(subset=["zip"]).copy()
-    counts = by_zip.groupby("zip")["receipt_id"].nunique()
-    locs = (
-        by_zip[["zip", "state", "city"]].drop_duplicates().assign(
-            n=lambda d: d["zip"].map(counts)
-        ).sort_values("n", ascending=False)
-    )
-    loc_labels = {
-        f"{r.city}, {r.state} {r.zip}": (str(r.zip), str(r.state), str(r.city))
-        for r in locs.itertuples()
-    }
-    if loc_labels:
-        st.sidebar.header("📍 Your location")
-        st.sidebar.caption("Sets what counts as 'near you' for price comparisons.")
-        pick = st.sidebar.selectbox("Home ZIP", list(loc_labels.keys()))
-        home_zip, home_state, home_city = loc_labels[pick]
-        st.sidebar.caption(
-            f"Showing deals near **{pick}**.\n\n"
-            "📍 same ZIP = your area · 🚗 same city = your city · "
-            "🗺️ same state = your region"
-        )
+    by_zip = df.dropna(subset=["zip"])
+    if not by_zip.empty:
+        default_zip = str(by_zip["zip"].value_counts().idxmax())
+
+st.sidebar.header("📍 Your location")
+st.sidebar.caption("Enter your ZIP — we'll fill in your city and find deals near you.")
+zip_in = geo.clean_zip(st.sidebar.text_input("Your ZIP code", value=default_zip, max_chars=5))
+if len(zip_in) == 5:
+    place = resolve_zip(zip_in)
+    home_zip = zip_in
+    if place:
+        home_city, home_state = place
+        st.sidebar.success(f"📍 {home_city}, {home_state} {home_zip}")
+    else:
+        st.sidebar.warning("Couldn't find that ZIP — using it as-is for area matching.")
+elif zip_in:
+    st.sidebar.caption("Enter all 5 digits of your ZIP.")
+st.sidebar.caption(
+    "📍 same ZIP = your area · 🚗 same city = your city · 🗺️ same state = your region"
+)
 
 with st.sidebar:
     st.divider()
