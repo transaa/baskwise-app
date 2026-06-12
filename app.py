@@ -85,7 +85,7 @@ def load_items() -> pd.DataFrame:
             SELECT i.id, i.name, i.norm_key, i.category, i.qty,
                    i.unit_price, i.line_total, i.upc,
                    r.store, r.city, r.state, r.zip,
-                   r.purchased_on, r.id AS receipt_id
+                   r.purchased_on, r.user_email, r.id AS receipt_id
             FROM items i
             JOIN receipts r ON r.id = i.receipt_id
             """,
@@ -109,6 +109,25 @@ def resolve_zip(zip_code: str):
 
 def refresh() -> None:
     load_items.clear()
+
+
+def auth_ready() -> bool:
+    """True if Google sign-in is configured (an [auth] section exists in secrets).
+    Until then the app runs in open mode (one shared journal, no login)."""
+    try:
+        return "auth" in st.secrets
+    except Exception:
+        return False
+
+
+def current_user() -> str | None:
+    """Email of the signed-in user, or None (open mode / not signed in)."""
+    try:
+        if getattr(st.user, "is_logged_in", False):
+            return st.user.email
+    except Exception:
+        pass
+    return None
 
 
 # Soft background colors per category, for colorful chips in tables.
@@ -147,15 +166,42 @@ st.caption(
 if added:
     st.success(f"Loaded {added} sample receipts to get you started.")
 
-df = load_items()
+# Community pool = everyone's data (the shared price database).
+# df = the current user's own receipts (their journal). In open mode (no
+# sign-in), df == community, so behavior is unchanged.
+community = load_items()
+me = current_user()
+df = (
+    community[community["user_email"] == me]
+    if (me and not community.empty) else community
+)
+
+# --- account: Google sign-in (open mode until [auth] is configured) ----------
+with st.sidebar:
+    if auth_ready():
+        if me:
+            st.success(f"👤 **{me}**")
+            st.caption("Receipts you add are saved to your private journal.")
+            if st.button("Sign out", use_container_width=True):
+                st.logout()
+        else:
+            st.caption(
+                "👋 **Sign in** to keep your own private journal — your receipts "
+                "stay yours, and still help the community price database."
+            )
+            if st.button("🔑 Sign in with Google", type="primary", use_container_width=True):
+                st.login("google")
+    else:
+        st.caption("👥 Open mode — everyone shares one journal (sign-in not set up yet).")
+    st.divider()
 
 # --- home location (powers all "near you" comparisons) ---------------------
 # Type any US ZIP → city/state auto-populate. Default to the area with the most
 # data so the demo opens on a populated location.
 home_zip, home_state, home_city = "", "", ""
 default_zip = ""
-if not df.empty:
-    by_zip = df.dropna(subset=["zip"])
+if not community.empty:
+    by_zip = community.dropna(subset=["zip"])
     if not by_zip.empty:
         default_zip = str(by_zip["zip"].value_counts().idxmax())
 
@@ -211,7 +257,10 @@ with tab_savings:
         st.info("Add a receipt to find savings.")
     else:
         # --- proactive: biggest savings opportunities near you ---
-        opps = top_opportunities(df, home_zip, home_state, home_city, limit=5)
+        # what YOU buy (df) vs cheapest in the COMMUNITY pool
+        opps = top_opportunities(
+            df, home_zip, home_state, home_city, limit=5, community=community
+        )
         if opps:
             st.subheader("🔥 Top savings opportunities near you")
             st.caption(
@@ -254,7 +303,10 @@ with tab_savings:
             for r in receipts.itertuples()
         }
         choice = st.selectbox("Receipt to analyze", list(label_to_id.keys()))
-        result = analyze_receipt(df, label_to_id[choice], home_zip, home_state, home_city)
+        # your receipt, priced against the community pool
+        result = analyze_receipt(
+            community, label_to_id[choice], home_zip, home_state, home_city
+        )
 
         c1, c2, c3 = st.columns(3)
         c1.metric("You paid", f"${result['paid_total']:.2f}")
@@ -328,12 +380,12 @@ with tab_alerts:
         "Set a target price for the things you buy. baskwise flags them the "
         "moment they drop to your price at a store near you."
     )
-    if df.empty:
+    if community.empty:
         st.info("Add a receipt first so there are products to watch.")
     else:
         with db.session() as conn:
             watches = db.list_watches(conn)
-        evals = evaluate_watches(df, watches, home_zip, home_state, home_city)
+        evals = evaluate_watches(community, watches, home_zip, home_state, home_city)
 
         triggered = [e for e in evals if e["triggered"]]
         if triggered:
@@ -370,7 +422,7 @@ with tab_alerts:
         st.divider()
         st.markdown("**Add a watch**")
         prods = (
-            df.groupby(["norm_key", "name"]).size().reset_index(name="n")
+            community.groupby(["norm_key", "name"]).size().reset_index(name="n")
             .sort_values("n", ascending=False)
         )
         name_to_key = {r["name"]: r["norm_key"] for _, r in prods.iterrows()}
@@ -398,17 +450,17 @@ with tab_upc:
         "community has logged for it, cheapest first."
     )
 
-    # UPCs already present in the receipt data, as one-tap quick-pick buttons.
+    # UPCs in the community pool, as one-tap quick-pick buttons.
     known = (
-        df[df["upc"].notna()][["upc", "name"]].drop_duplicates()
-        if not df.empty else pd.DataFrame(columns=["upc", "name"])
+        community[community["upc"].notna()][["upc", "name"]].drop_duplicates()
+        if not community.empty else pd.DataFrame(columns=["upc", "name"])
     )
     examples: dict[str, str] = {}
     for r in known.itertuples():
         examples.setdefault(r.upc, r.name)
 
     if examples:
-        st.caption("Quick pick a product from your receipts:")
+        st.caption("Quick pick a product:")
         cols = st.columns(len(examples))
         for col, (code, name) in zip(cols, examples.items()):
             if col.button(name, key=f"upcpick_{code}", use_container_width=True):
@@ -434,7 +486,7 @@ with tab_upc:
             st.markdown(f"### UPC {product.upc}")
             st.caption(f"{badge} — we couldn't identify this product, but price data still works.")
 
-        prices = df[df["upc"] == upc] if not df.empty else pd.DataFrame()
+        prices = community[community["upc"] == upc] if not community.empty else pd.DataFrame()
 
         if not prices.empty:
             # Latest price per physical store location (store + ZIP).
@@ -590,21 +642,21 @@ with tab_overview:
 # --- Price History ---------------------------------------------------------
 
 with tab_prices:
-    if df.empty:
+    if community.empty:
         st.info("Add a receipt to track price history.")
     else:
         st.subheader("How has the price of an item changed?")
-        # Offer items that appear more than once so the chart is meaningful.
-        counts = df.groupby(["norm_key", "name"]).size().reset_index(name="n")
+        # Community-wide history, so charts are rich even before you have much data.
+        counts = community.groupby(["norm_key", "name"]).size().reset_index(name="n")
         counts = counts.sort_values("n", ascending=False)
         label_to_key = {
-            f"{row['name']}  ({row['n']} purchases)": row["norm_key"]
+            f"{row['name']}  ({row['n']} data points)": row["norm_key"]
             for _, row in counts.iterrows()
         }
         choice = st.selectbox("Pick an item", list(label_to_key.keys()))
         key = label_to_key[choice]
 
-        item_df = df[df["norm_key"] == key].sort_values("purchased_on")
+        item_df = community[community["norm_key"] == key].sort_values("purchased_on")
         pivot = item_df.pivot_table(
             index="purchased_on", columns="store", values="unit_price", aggfunc="mean"
         )
@@ -638,14 +690,14 @@ with tab_prices:
 # --- Basket Comparison -----------------------------------------------------
 
 with tab_basket:
-    if df.empty:
+    if community.empty:
         st.info("Add a receipt to compare baskets across stores.")
     else:
         st.subheader("Which store is cheaper for your basket?")
         st.caption("Uses the most recent known price for each item at each store.")
 
         names = (
-            df.groupby(["norm_key", "name"]).size().reset_index(name="n")
+            community.groupby(["norm_key", "name"]).size().reset_index(name="n")
             .sort_values("n", ascending=False)
         )
         name_to_key = {row["name"]: row["norm_key"] for _, row in names.iterrows()}
@@ -657,7 +709,7 @@ with tab_basket:
 
         if picked:
             keys = [name_to_key[p] for p in picked]
-            basket = df[df["norm_key"].isin(keys)].copy()
+            basket = community[community["norm_key"].isin(keys)].copy()
             # Latest unit price per (item, store).
             latest = (
                 basket.sort_values("purchased_on")
@@ -838,6 +890,7 @@ with tab_add:
                         state=parsed.state,
                         zip=parsed.zip,
                         purchased_time=parsed.time,
+                        user_email=me,
                     )
                 refresh()
                 st.session_state.pop("ocr_text", None)

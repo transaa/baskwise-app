@@ -7,6 +7,10 @@ pandas>=2.0
 SQLAlchemy>=2.0
 psycopg2-binary>=2.9
 
+# Sign in with Google (Streamlit native OIDC auth) — active once [auth] is
+# configured in secrets; the app runs in open mode without it.
+Authlib>=1.3.2
+
 # Photo-receipt OCR. The Tesseract *binary* is installed via packages.txt
 # (tesseract-ocr); these are the Python bindings.
 pytesseract>=0.3.10

@@ -42,6 +42,7 @@ RECEIPTS = Table(
     Column("total", Float),
     Column("source_file", String),
     Column("created_at", String),
+    Column("user_email", String, index=True),         # owner; NULL = community/seed
 )
 
 ITEMS = Table(
@@ -102,8 +103,27 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
+def _migrate(engine: Engine) -> None:
+    """Add columns that post-date a deployed DB (works on SQLite + Postgres)."""
+    from sqlalchemy import inspect, text
+
+    insp = inspect(engine)
+    tables = set(insp.get_table_names())
+    wanted = {"receipts": ["user_email"]}
+    with engine.begin() as conn:
+        for table, cols in wanted.items():
+            if table not in tables:
+                continue
+            have = {c["name"] for c in insp.get_columns(table)}
+            for col in cols:
+                if col not in have:
+                    conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {col} VARCHAR"))
+
+
 def init_db(db_path: str = DB_PATH) -> None:
-    metadata.create_all(get_engine())
+    engine = get_engine()
+    metadata.create_all(engine)
+    _migrate(engine)
 
 
 @contextmanager
@@ -125,12 +145,14 @@ def insert_receipt(
     state: str | None = None,
     zip: str | None = None,
     purchased_time: str | None = None,
+    user_email: str | None = None,
 ) -> int:
     """Insert one receipt and its line items. Returns the new receipt id."""
     result = conn.execute(RECEIPTS.insert().values(
         store=store, city=city, state=state, zip=zip,
         purchased_on=purchased_on, purchased_time=purchased_time,
         total=total, source_file=source_file, created_at=_now(),
+        user_email=user_email,
     ))
     receipt_id = int(result.inserted_primary_key[0])
     rows = [

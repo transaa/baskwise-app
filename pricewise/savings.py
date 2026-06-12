@@ -133,18 +133,21 @@ def top_opportunities(
     home_city: str = "",
     limit: int = 5,
     min_savings: float = 0.05,
+    community: pd.DataFrame | None = None,
 ) -> list[dict]:
     """Across everything the shopper buys, where are they overpaying the most?
 
-    For each product, compares the price they most recently paid against the
-    cheapest *nearby* price for the same product at a different store. Returns
-    the biggest per-unit savings opportunities, ranked.
+    `items` is the shopper's own history (what they pay); `community` is the
+    shared price pool used to find the cheapest nearby price (defaults to
+    `items` when not provided). Returns the biggest per-unit savings
+    opportunities, ranked.
     """
     if items.empty:
         return []
 
+    price_source = community if community is not None else items
     latest = _tag_proximity(
-        latest_price_by_store(items), home_zip, home_state, home_city
+        latest_price_by_store(price_source), home_zip, home_state, home_city
     )
     use_location = bool(home_zip or home_state or home_city)
 
