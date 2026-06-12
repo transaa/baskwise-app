@@ -34,15 +34,36 @@ directly** (its own HTTPS — no redirect). It deploys from the same GitHub repo
    **auto-issues a free HTTPS certificate**. Then `https://baskwise.app` serves
    the app directly. 🎉
 
+## Make data persistent — connect a free Postgres (Supabase or Neon)
+
+By default the app uses an ephemeral SQLite file that resets on every restart.
+To get a **persistent, ever-growing community database**, point it at a free
+cloud Postgres. The app auto-switches the moment a `DATABASE_URL` is present —
+no code change.
+
+1. Create a free Postgres:
+   - **Neon** (<https://neon.tech>) → New Project → copy the **connection string**, or
+   - **Supabase** (<https://supabase.com>) → New Project → Settings → Database →
+     **Connection string (URI)**. Use the connection string (include the password).
+2. In **Render → your `baskwise` service → Environment → Add Environment Variable**:
+   - **Key:** `DATABASE_URL`
+   - **Value:** the Postgres connection string (e.g. `postgresql://user:pass@host:5432/dbname`)
+3. **Save** → Render redeploys. On first boot the app creates the tables and seeds
+   the sample data into Postgres; after that, **every receipt persists** across
+   restarts and accumulates for all users.
+
+> The app accepts either `postgres://` or `postgresql://` and adjusts
+> automatically. Leave `DATABASE_URL` unset to keep using local SQLite in dev.
+
 ## Good to know (honest caveats)
 
 - **Free tier sleeps** after ~15 min idle → the first visit then takes ~50s to
   wake. Fine for early users; upgrade to **Starter ($7/mo)** for always-on when
   you launch for real.
 - **Anonymous access** — no login wall (the key win over Streamlit Cloud).
-- **The database is still ephemeral** (resets on redeploy/restart). For real
-  users, switch to free hosted Postgres (**Supabase/Neon**) — a code change I can
-  make.
+- **Data persistence:** without `DATABASE_URL` the DB is ephemeral (resets on
+  restart). Set `DATABASE_URL` to a free Postgres (see the section above) and data
+  persists and accumulates — the code already supports it, no change needed.
 - **Updating the app:** push to GitHub → Render auto-redeploys (autoDeploy is on).
 
 ## If a deploy fails

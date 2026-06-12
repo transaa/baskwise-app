@@ -1,111 +1,120 @@
-"""SQLite storage layer for PriceWise.
+"""Storage layer for baskwise.
 
-Schema is intentionally small and factual: receipts and their line items.
-Raw UPCs, prices, store, and date are facts (not copyrightable), which is what
-makes the crowdsourced price database both legal and valuable.
+Backed by SQLAlchemy so a single DATABASE_URL switches between local SQLite
+(development) and cloud Postgres (production) with no other code changes:
+
+  • DATABASE_URL unset            -> local SQLite file (pricewise.db)
+  • DATABASE_URL=postgresql://... -> persistent Postgres (Supabase / Neon)
+
+Set DATABASE_URL on the host (e.g. Render) to a free Supabase/Neon Postgres to
+get a persistent, multi-user, ever-growing community price database. Schema is
+small and factual: receipts, their line items, and price watches.
 """
 
 from __future__ import annotations
 
 import os
-import sqlite3
 from contextlib import contextmanager
+from datetime import datetime, timezone
 from typing import Iterable, Iterator
+
+from sqlalchemy import (
+    Column, Float, ForeignKey, Integer, MetaData, String, Table,
+    create_engine, func, select,
+)
+from sqlalchemy.engine import Connection, Engine
 
 DB_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "pricewise.db")
 
-SCHEMA = """
-CREATE TABLE IF NOT EXISTS receipts (
-    id           INTEGER PRIMARY KEY AUTOINCREMENT,
-    store        TEXT NOT NULL,
-    city         TEXT,
-    state        TEXT,
-    zip          TEXT,
-    purchased_on TEXT NOT NULL,          -- ISO date (YYYY-MM-DD) — required
-    purchased_time TEXT,                 -- HH:MM (24h) if on the receipt
-    total        REAL,
-    source_file  TEXT,
-    created_at   TEXT NOT NULL DEFAULT (datetime('now'))
-);
+metadata = MetaData()
 
-CREATE TABLE IF NOT EXISTS items (
-    id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    receipt_id  INTEGER NOT NULL REFERENCES receipts(id) ON DELETE CASCADE,
-    raw_text    TEXT NOT NULL,
-    name        TEXT NOT NULL,           -- normalized display name
-    norm_key    TEXT NOT NULL,           -- canonical key for matching across receipts
-    category    TEXT NOT NULL,
-    upc         TEXT,
-    qty         REAL NOT NULL DEFAULT 1,
-    unit_price  REAL,
-    line_total  REAL NOT NULL
-);
+# Tables are UPPERCASE module constants so they don't collide with the `items`
+# function parameter in insert_receipt.
+RECEIPTS = Table(
+    "receipts", metadata,
+    Column("id", Integer, primary_key=True),
+    Column("store", String, nullable=False),
+    Column("city", String),
+    Column("state", String),
+    Column("zip", String),
+    Column("purchased_on", String, nullable=False),   # ISO date — required
+    Column("purchased_time", String),                 # HH:MM if on receipt
+    Column("total", Float),
+    Column("source_file", String),
+    Column("created_at", String),
+)
 
-CREATE INDEX IF NOT EXISTS idx_items_normkey ON items(norm_key);
-CREATE INDEX IF NOT EXISTS idx_items_category ON items(category);
-CREATE INDEX IF NOT EXISTS idx_receipts_store ON receipts(store);
+ITEMS = Table(
+    "items", metadata,
+    Column("id", Integer, primary_key=True),
+    Column("receipt_id", Integer,
+           ForeignKey("receipts.id", ondelete="CASCADE"), nullable=False, index=True),
+    Column("raw_text", String, nullable=False),
+    Column("name", String, nullable=False),
+    Column("norm_key", String, nullable=False, index=True),
+    Column("category", String, nullable=False, index=True),
+    Column("upc", String),
+    Column("qty", Float, nullable=False, default=1),
+    Column("unit_price", Float),
+    Column("line_total", Float, nullable=False),
+)
 
-CREATE TABLE IF NOT EXISTS watches (
-    id         INTEGER PRIMARY KEY AUTOINCREMENT,
-    norm_key   TEXT NOT NULL,
-    label      TEXT NOT NULL,          -- human-friendly product name
-    threshold  REAL NOT NULL,          -- alert when cheapest nearby <= this
-    created_at TEXT NOT NULL DEFAULT (datetime('now')),
-    UNIQUE(norm_key)
-);
-"""
+WATCHES = Table(
+    "watches", metadata,
+    Column("id", Integer, primary_key=True),
+    Column("norm_key", String, nullable=False, unique=True),
+    Column("label", String, nullable=False),
+    Column("threshold", Float, nullable=False),
+    Column("created_at", String),
+)
 
-
-def add_watch(conn: sqlite3.Connection, *, norm_key: str, label: str, threshold: float) -> None:
-    """Add or update a price watch for a product."""
-    conn.execute(
-        "INSERT INTO watches (norm_key, label, threshold) VALUES (?, ?, ?) "
-        "ON CONFLICT(norm_key) DO UPDATE SET threshold=excluded.threshold, "
-        "label=excluded.label",
-        (norm_key, label, threshold),
-    )
+_engine: Engine | None = None
 
 
-def list_watches(conn: sqlite3.Connection) -> list[dict]:
-    rows = conn.execute(
-        "SELECT id, norm_key, label, threshold FROM watches ORDER BY label"
-    ).fetchall()
-    return [dict(r) for r in rows]
+def database_url() -> str:
+    """Resolve the DB URL: DATABASE_URL if set, else a local SQLite file."""
+    url = os.environ.get("DATABASE_URL", "").strip()
+    if url:
+        # Some hosts hand out the legacy postgres:// scheme; SQLAlchemy wants postgresql://
+        if url.startswith("postgres://"):
+            url = url.replace("postgres://", "postgresql://", 1)
+        return url
+    return f"sqlite:///{DB_PATH}"
 
 
-def delete_watch(conn: sqlite3.Connection, watch_id: int) -> None:
-    conn.execute("DELETE FROM watches WHERE id = ?", (watch_id,))
+def is_postgres() -> bool:
+    return database_url().startswith("postgresql")
 
 
-def get_connection(db_path: str = DB_PATH) -> sqlite3.Connection:
-    conn = sqlite3.connect(db_path)
-    conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA foreign_keys = ON")
-    return conn
+def get_engine() -> Engine:
+    global _engine
+    if _engine is None:
+        _engine = create_engine(database_url(), future=True, pool_pre_ping=True)
+    return _engine
+
+
+def get_connection() -> Connection:
+    """A fresh SQLAlchemy connection (works as a context manager and with pandas)."""
+    return get_engine().connect()
+
+
+def _now() -> str:
+    return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
 def init_db(db_path: str = DB_PATH) -> None:
-    with get_connection(db_path) as conn:
-        conn.executescript(SCHEMA)
-        # Migration for older DBs that predate the purchased_time column.
-        cols = {r["name"] for r in conn.execute("PRAGMA table_info(receipts)")}
-        if "purchased_time" not in cols:
-            conn.execute("ALTER TABLE receipts ADD COLUMN purchased_time TEXT")
-        conn.commit()
+    metadata.create_all(get_engine())
 
 
 @contextmanager
-def session(db_path: str = DB_PATH) -> Iterator[sqlite3.Connection]:
-    conn = get_connection(db_path)
-    try:
+def session(db_path: str = DB_PATH) -> Iterator[Connection]:
+    """Transactional connection — commits on success, rolls back on error."""
+    with get_engine().begin() as conn:
         yield conn
-        conn.commit()
-    finally:
-        conn.close()
 
 
 def insert_receipt(
-    conn: sqlite3.Connection,
+    conn: Connection,
     *,
     store: str,
     purchased_on: str,
@@ -118,41 +127,65 @@ def insert_receipt(
     purchased_time: str | None = None,
 ) -> int:
     """Insert one receipt and its line items. Returns the new receipt id."""
-    cur = conn.execute(
-        "INSERT INTO receipts "
-        "(store, city, state, zip, purchased_on, purchased_time, total, source_file) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-        (store, city, state, zip, purchased_on, purchased_time, total, source_file),
-    )
-    receipt_id = int(cur.lastrowid)
-    for it in items:
-        conn.execute(
-            "INSERT INTO items "
-            "(receipt_id, raw_text, name, norm_key, category, upc, qty, unit_price, line_total) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            (
-                receipt_id,
-                it["raw_text"],
-                it["name"],
-                it["norm_key"],
-                it["category"],
-                it.get("upc"),
-                it.get("qty", 1),
-                it.get("unit_price"),
-                it["line_total"],
-            ),
-        )
+    result = conn.execute(RECEIPTS.insert().values(
+        store=store, city=city, state=state, zip=zip,
+        purchased_on=purchased_on, purchased_time=purchased_time,
+        total=total, source_file=source_file, created_at=_now(),
+    ))
+    receipt_id = int(result.inserted_primary_key[0])
+    rows = [
+        {
+            "receipt_id": receipt_id,
+            "raw_text": it["raw_text"],
+            "name": it["name"],
+            "norm_key": it["norm_key"],
+            "category": it["category"],
+            "upc": it.get("upc"),
+            "qty": it.get("qty", 1),
+            "unit_price": it.get("unit_price"),
+            "line_total": it["line_total"],
+        }
+        for it in items
+    ]
+    if rows:
+        conn.execute(ITEMS.insert(), rows)
     return receipt_id
 
 
+def add_watch(conn: Connection, *, norm_key: str, label: str, threshold: float) -> None:
+    """Add or update a price watch (dialect-agnostic upsert)."""
+    exists = conn.execute(
+        select(WATCHES.c.id).where(WATCHES.c.norm_key == norm_key)
+    ).first()
+    if exists:
+        conn.execute(
+            WATCHES.update().where(WATCHES.c.norm_key == norm_key)
+            .values(label=label, threshold=threshold)
+        )
+    else:
+        conn.execute(WATCHES.insert().values(
+            norm_key=norm_key, label=label, threshold=threshold, created_at=_now(),
+        ))
+
+
+def list_watches(conn: Connection) -> list[dict]:
+    rows = conn.execute(
+        select(WATCHES.c.id, WATCHES.c.norm_key, WATCHES.c.label, WATCHES.c.threshold)
+        .order_by(WATCHES.c.label)
+    ).mappings().all()
+    return [dict(r) for r in rows]
+
+
+def delete_watch(conn: Connection, watch_id: int) -> None:
+    conn.execute(WATCHES.delete().where(WATCHES.c.id == watch_id))
+
+
 def is_empty(db_path: str = DB_PATH) -> bool:
-    with get_connection(db_path) as conn:
-        row = conn.execute("SELECT COUNT(*) AS n FROM receipts").fetchone()
-        return row["n"] == 0
+    with get_engine().connect() as conn:
+        n = conn.execute(select(func.count()).select_from(RECEIPTS)).scalar()
+        return (n or 0) == 0
 
 
 def reset_db(db_path: str = DB_PATH) -> None:
-    with get_connection(db_path) as conn:
-        conn.executescript("DROP TABLE IF EXISTS items; DROP TABLE IF EXISTS receipts;")
-        conn.commit()
-    init_db(db_path)
+    metadata.drop_all(get_engine())
+    metadata.create_all(get_engine())
