@@ -14,6 +14,7 @@ from pricewise.location import (
 )
 from pricewise.ocr import image_to_text, ocr_available
 from pricewise.parser import parse_receipt
+from pricewise.freshness import is_stale, label as freshness_label
 from pricewise.insights import staple_inflation
 from pricewise.savings import analyze_receipt, top_opportunities
 from pricewise.seed import ensure_seeded
@@ -376,8 +377,13 @@ with tab_upc:
                 st.success(
                     f"💲 Cheapest **near you**: **{best_near['store']}** at "
                     f"**${best_near['unit_price']:.2f}** — {best_near['place']} "
-                    f"(seen {best_near['purchased_on'].date()})"
+                    f"({freshness_label(best_near['purchased_on'])})"
                 )
+                if is_stale(best_near["purchased_on"]):
+                    st.caption(
+                        "⚠️ This price is getting old — it may have changed in store. "
+                        "Snap a fresh receipt to update it for everyone."
+                    )
                 # Is somewhere else (out of town) cheaper, and how much?
                 if cheapest_anywhere["unit_price"] < best_near["unit_price"] - 0.001:
                     diff = best_near["unit_price"] - cheapest_anywhere["unit_price"]
@@ -402,9 +408,14 @@ with tab_upc:
                 lambda p: badge_map.get(p, "🌎 other regions")
             )
             show["unit_price"] = show["unit_price"].map("${:.2f}".format)
-            show["purchased_on"] = show["purchased_on"].dt.date
-            show.columns = ["Store", "Location", "Distance", "Latest price", "Last seen"]
+            show["purchased_on"] = show["purchased_on"].map(freshness_label)
+            show.columns = ["Store", "Location", "Distance", "Latest price", "Freshness"]
             st.dataframe(show, use_container_width=True, hide_index=True)
+            st.caption(
+                "Prices are the **freshest the community has reported**, with their age. "
+                "🟢 fresh (≤2 wks) · 🟡 aging · 🔴 stale (>6 wks). They get more "
+                "real-time as more shoppers snap receipts near you."
+            )
 
             near_spread = (
                 near["unit_price"].max() - near["unit_price"].min()
