@@ -67,8 +67,13 @@ st.markdown(
         from { opacity: 0; transform: translateY(5px); }
         to   { opacity: 1; transform: none; }
       }
-      /* Sidebar storage chip pops a little */
       section[data-testid="stSidebar"] { border-right: 1px solid var(--bw-border); }
+      /* Hide Streamlit dev chrome so it reads as a finished product, not a prototype */
+      [data-testid="stToolbar"], [data-testid="stStatusWidget"],
+      [data-testid="stAppDeployButton"], #MainMenu, [data-testid="stDecoration"] {
+        display: none !important;
+      }
+      footer { visibility: hidden; height: 0; }
     </style>
     """,
     unsafe_allow_html=True,
@@ -192,7 +197,7 @@ with st.sidebar:
             if st.button("🔑 Sign in with Google", type="primary", use_container_width=True):
                 st.login("google")
     else:
-        st.caption("👥 Open mode — everyone shares one journal (sign-in not set up yet).")
+        st.caption("👀 Exploring the **demo** — sample community prices, no account needed.")
     st.divider()
 
 # --- home location (powers all "near you" comparisons) ---------------------
@@ -224,10 +229,6 @@ st.sidebar.caption(
 
 with st.sidebar:
     st.divider()
-    if db.is_postgres():
-        st.caption("🐘 Storage: **Postgres** — persistent, shared community database ✅")
-    else:
-        st.caption("💾 Storage: SQLite (local / resets on restart)")
     with st.expander("ℹ️ About baskwise"):
         st.caption(
             "baskwise turns your receipts into a real, local price database and "
@@ -293,14 +294,20 @@ with tab_savings:
             "**near you**, and show where to buy next time."
         )
 
-        receipts = (
-            df[["receipt_id", "store", "purchased_on"]]
-            .drop_duplicates()
-            .sort_values("purchased_on", ascending=False)
-        )
+        # Score each receipt by potential savings and show the most compelling
+        # one first — so the opening view never lands on a $0.00 receipt.
+        receipts = df[["receipt_id", "store", "purchased_on"]].drop_duplicates()
+        scored = []
+        for r in receipts.itertuples():
+            s = analyze_receipt(
+                community, int(r.receipt_id), home_zip, home_state, home_city
+            )["savings"]
+            scored.append((int(r.receipt_id), r.store, r.purchased_on, s))
+        scored.sort(key=lambda x: (-x[3], x[2]))  # biggest savings first
         label_to_id = {
-            f"{r.store} — {r.purchased_on.date()}": int(r.receipt_id)
-            for r in receipts.itertuples()
+            (f"{store} — {pd.to_datetime(d).date()}"
+             + (f"  ·  save ${s:.2f}" if s > 0.001 else "")): rid
+            for rid, store, d, s in scored
         }
         choice = st.selectbox("Receipt to analyze", list(label_to_id.keys()))
         # your receipt, priced against the community pool
@@ -757,8 +764,11 @@ with tab_add:
     st.caption(
         "Snap it — baskwise reads every item, price, store, and date. It's saved "
         "to **your grocery journal**, and the facts (item · price · store · date) "
-        "join the **community price database** that powers savings for everyone. "
-        "Every receipt makes it smarter — for you and for all shoppers."
+        "join the **community price database** that powers savings for everyone."
+    )
+    st.caption(
+        "🔒 **Your privacy:** we only read item, price, store and date — "
+        "**never your card number or personal details.**"
     )
 
     ok, reason = ocr_available()

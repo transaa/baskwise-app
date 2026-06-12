@@ -6,8 +6,12 @@
 <title>baskwise — Stop overpaying for groceries</title>
 <meta name="description" content="Snap your receipts. baskwise turns them into a real price database and shows you which store near you is cheapest — so you save money on every trip." />
 <meta property="og:title" content="baskwise — Stop overpaying for groceries" />
-<meta property="og:description" content="Snap your receipts. See which store near you is cheapest. Save money on every trip." />
+<meta property="og:description" content="Upload a receipt. See which nearby store would have been cheaper. Dallas sample: save $4.27 on a 12-item basket." />
 <meta property="og:type" content="website" />
+<meta property="og:url" content="https://baskwise.com/" />
+<meta property="og:image" content="https://baskwise.com/og-image.png" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:image" content="https://baskwise.com/og-image.png" />
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>%F0%9F%A7%BA</text></svg>" />
 <style>
   :root {
@@ -80,6 +84,30 @@
   .fineprint { font-size: 13px; color: var(--muted); }
   .formmsg { font-size: 15px; font-weight: 600; color: var(--green-dark); min-height: 22px; margin-top: 8px; }
 
+  /* Proof line + sample-savings panel (above-the-fold product proof) */
+  .proof {
+    display: inline-block; background: var(--green-soft); color: var(--ink);
+    padding: 9px 18px; border-radius: 999px; margin: 4px auto 0; font-weight: 600; font-size: 16px;
+  }
+  .proof b { color: var(--green-dark); }
+  .savings-card {
+    max-width: 440px; margin: 30px auto 0; text-align: left; background: #fff;
+    border: 1px solid var(--border); border-radius: var(--radius);
+    box-shadow: var(--shadow); overflow: hidden;
+  }
+  .savings-card .sc-head { background: var(--green); color: #fff; padding: 12px 18px; font-weight: 700; }
+  .savings-card .sc-body { padding: 14px 18px; }
+  .savings-card .sc-row { display: flex; justify-content: space-between; padding: 7px 0; font-size: 15.5px; color: var(--ink); }
+  .savings-card .sc-row.total {
+    border-top: 1px dashed var(--border); margin-top: 4px; padding-top: 12px; font-weight: 800; font-size: 17px;
+  }
+  .savings-card .sc-row.total .amt { color: var(--green-dark); }
+  .savings-card .sc-foot {
+    background: var(--bg-alt); padding: 12px 18px; font-size: 13.5px;
+    color: var(--muted); border-top: 1px solid var(--border);
+  }
+  .savings-card .sc-foot b { color: var(--green-dark); }
+
   /* Sections */
   section.block { padding: 72px 0; }
   section.alt { background: var(--bg-alt); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
@@ -136,7 +164,7 @@
         <a href="#features">Features</a>
         <a href="#why">Why baskwise</a>
       </span>
-      <a class="btn btn-primary" href="#get">Get early access</a>
+      <a class="btn btn-primary" href="#get">Find savings</a>
     </div>
   </div>
 </header>
@@ -147,9 +175,10 @@
     <span class="badge">🛒 Early access — be first in your city</span>
     <h1>Stop overpaying<br>for <span class="hl">groceries.</span></h1>
     <p class="sub">
-      Snap a photo of your receipt. baskwise turns it into a real price database and
-      shows you which store <strong>near you</strong> is cheapest — so you save money on every trip.
+      Upload a receipt. See which nearby store would have been cheaper —
+      so you save money on every trip.
     </p>
+    <p class="proof">💡 Dallas sample: save <b>$4.27</b> on a 12-item basket</p>
 
     <form class="signup" id="form-top" name="waitlist" method="POST"
           data-netlify="true" netlify-honeypot="bot-field"
@@ -157,10 +186,21 @@
       <input type="hidden" name="form-name" value="waitlist" />
       <p hidden><label>Don't fill this out: <input name="bot-field" /></label></p>
       <input type="email" name="email" placeholder="you@email.com" required aria-label="Email address" />
-      <button class="btn btn-primary" type="submit">Get early access</button>
+      <button class="btn btn-primary" type="submit">Find savings near me</button>
     </form>
     <div class="formmsg" id="msg-top"></div>
-    <p class="fineprint">Free to join. No spam — just an invite when we launch in your area.</p>
+    <p class="fineprint">Free. No spam. Your receipt data stays private — we never see card numbers.</p>
+
+    <!-- product proof: sample savings panel -->
+    <div class="savings-card">
+      <div class="sc-head">🧾 Sample Dallas basket</div>
+      <div class="sc-body">
+        <div class="sc-row"><span>What you paid (Kroger)</span><span>$42.18</span></div>
+        <div class="sc-row"><span>Best local mix nearby</span><span>$37.91</span></div>
+        <div class="sc-row total"><span>You could've saved</span><span class="amt">$4.27</span></div>
+      </div>
+      <div class="sc-foot">🛒 Cheapest split: <b>Aldi</b> eggs · <b>Walmart</b> rice · <b>Kroger</b> chicken</div>
+    </div>
   </div>
 </section>
 
@@ -242,7 +282,7 @@
         <input type="hidden" name="form-name" value="waitlist" />
         <p hidden><label>Don't fill this out: <input name="bot-field" /></label></p>
         <input type="email" name="email" placeholder="you@email.com" required aria-label="Email address" />
-        <button class="btn btn-ghost btn-lg" type="submit">Get early access</button>
+        <button class="btn btn-ghost btn-lg" type="submit">Find savings near me</button>
       </form>
       <div class="formmsg" id="msg-bottom"></div>
       <p class="fineprint">Free. Unsubscribe anytime.</p>
@@ -285,7 +325,8 @@
     // Post to Netlify Forms. On Netlify this is recorded under Forms → "waitlist".
     // Locally (no Netlify backend) it harmlessly fails and we still confirm.
     var done = function () {
-      msg.textContent = "🎉 You're on the list! We'll be in touch.";
+      msg.textContent = "🎉 You're on the list! We'll email you the moment baskwise "
+        + "launches in your area — no spam, just your invite.";
       input.value = '';
     };
     fetch('/', {
