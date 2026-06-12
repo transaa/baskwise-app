@@ -24,6 +24,45 @@ from pricewise.watches import evaluate_watches
 
 st.set_page_config(page_title="baskwise", page_icon="🧺", layout="wide")
 
+# --- brand styling: card-style metrics, rounded buttons, cleaner tabs --------
+st.markdown(
+    """
+    <style>
+      :root { --bw-green:#1f8a4c; --bw-soft:#e8f6ee; --bw-border:#dfeae3; }
+      /* Metrics as soft cards */
+      [data-testid="stMetric"] {
+        background: #f6faf7; border: 1px solid var(--bw-border);
+        border-radius: 16px; padding: 14px 18px;
+      }
+      [data-testid="stMetricValue"] { color: var(--bw-green); font-weight: 800; }
+      /* Buttons: pill-shaped with a gentle hover lift */
+      .stButton > button, .stFormSubmitButton > button, .stDownloadButton > button,
+      [data-testid="stLinkButton"] a {
+        border-radius: 999px !important; font-weight: 700 !important;
+        transition: transform .06s ease, box-shadow .2s ease, background .2s ease;
+      }
+      .stButton > button:hover, [data-testid="stLinkButton"] a:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 6px 18px rgba(31,138,76,.20);
+      }
+      /* Link-buttons take the brand color */
+      [data-testid="stLinkButton"] a {
+        background: var(--bw-soft) !important; color: var(--bw-green) !important;
+        border: 1px solid var(--bw-border) !important;
+      }
+      /* Tabs: roomier, clearer active state */
+      [data-baseweb="tab-list"] { gap: 4px; flex-wrap: wrap; }
+      button[data-baseweb="tab"] { font-size: 15px; font-weight: 600; padding: 8px 14px; }
+      button[data-baseweb="tab"][aria-selected="true"] { color: var(--bw-green); }
+      /* Tighter, friendlier headings */
+      h1, h2, h3 { letter-spacing: -0.4px; }
+      /* Dataframes: soft rounded frame */
+      [data-testid="stDataFrame"] { border-radius: 12px; }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
 
 # --- data access -----------------------------------------------------------
 
@@ -107,9 +146,10 @@ with st.sidebar:
         st.caption(
             "baskwise turns your receipts into a real, local price database and "
             "shows you where to shop to save — built around real shoppers, not "
-            "retailer ads.\n\n"
-            "🌐 [baskwise.com](https://baskwise.com) · 📱 [baskwise.app](https://baskwise.app)"
+            "retailer ads."
         )
+        st.link_button("🌐 baskwise.com", "https://baskwise.com", use_container_width=True)
+        st.link_button("📱 Open the app", "https://baskwise.app", use_container_width=True)
 
 if df.empty:
     st.warning("No data yet. Add a receipt in the **Add Receipt** tab.")
@@ -785,4 +825,4 @@ with tab_add:
 st.divider()
 fcol1, fcol2 = st.columns([3, 1])
 fcol1.caption("🧺 **baskwise** — save smarter, every trip.")
-fcol2.caption("[baskwise.app](https://baskwise.app)")
+fcol2.link_button("📱 Open baskwise.app", "https://baskwise.app", use_container_width=True)
