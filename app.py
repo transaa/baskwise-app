@@ -32,9 +32,11 @@ st.markdown(
       /* Metrics as soft cards */
       [data-testid="stMetric"] {
         background: #f6faf7; border: 1px solid var(--bw-border);
-        border-radius: 16px; padding: 14px 18px;
+        border-radius: 16px; padding: 12px 14px;
       }
-      [data-testid="stMetricValue"] { color: var(--bw-green); font-weight: 800; }
+      [data-testid="stMetricValue"] {
+        color: var(--bw-green); font-weight: 700; font-size: 1.85rem;
+      }
       /* Buttons: pill-shaped with a gentle hover lift */
       .stButton > button, .stFormSubmitButton > button, .stDownloadButton > button,
       [data-testid="stLinkButton"] a {
@@ -58,6 +60,14 @@ st.markdown(
       h1, h2, h3 { letter-spacing: -0.4px; }
       /* Dataframes: soft rounded frame */
       [data-testid="stDataFrame"] { border-radius: 12px; }
+      /* Gentle fade-in for alerts (savings reveals, confirmations) */
+      [data-testid="stAlert"] { animation: bwfade .45s ease; }
+      @keyframes bwfade {
+        from { opacity: 0; transform: translateY(5px); }
+        to   { opacity: 1; transform: none; }
+      }
+      /* Sidebar storage chip pops a little */
+      section[data-testid="stSidebar"] { border-right: 1px solid var(--bw-border); }
     </style>
     """,
     unsafe_allow_html=True,
@@ -93,6 +103,30 @@ def resolve_upc_cached(upc: str):
 
 def refresh() -> None:
     load_items.clear()
+
+
+# Soft background colors per category, for colorful chips in tables.
+CATEGORY_COLORS = {
+    "Produce": "#e3f5e1", "Meat & Seafood": "#fbe4e4", "Dairy & Eggs": "#fff6da",
+    "Bakery": "#f4e9d6", "Frozen": "#e2f0fb", "Beverages": "#e6ecfb",
+    "Snacks & Candy": "#fce3f1", "Pantry": "#efeadf", "Household": "#e3f1f1",
+    "Personal Care": "#f0e8fa", "Baby": "#fdeede", "Pet": "#ece8e2",
+    "Other": "#f0f0f0",
+}
+
+
+def show_table(df_in, **kwargs):
+    """Render a dataframe with category cells tinted by category color."""
+    if "category" in df_in.columns:
+        styler = df_in.style.apply(
+            lambda col: [
+                f"background-color: {CATEGORY_COLORS.get(v, '#f0f0f0')}" for v in col
+            ],
+            subset=["category"],
+        )
+        st.dataframe(styler, **kwargs)
+    else:
+        st.dataframe(df_in, **kwargs)
 
 
 # --- bootstrap -------------------------------------------------------------
@@ -152,7 +186,10 @@ with st.sidebar:
         st.link_button("📱 Open the app", "https://baskwise.app", use_container_width=True)
 
 if df.empty:
-    st.warning("No data yet. Add a receipt in the **Add Receipt** tab.")
+    st.info(
+        "👋 **Welcome to baskwise!** Snap your first receipt in the "
+        "**➕ Add Receipt** tab to start tracking prices and finding savings near you."
+    )
 
 (tab_savings, tab_alerts, tab_upc, tab_overview, tab_prices,
  tab_basket, tab_add) = st.tabs(
@@ -250,7 +287,7 @@ with tab_savings:
             view["save/unit"] = view["savings"].apply(
                 lambda s: f"${s:.2f}" if s > 0.001 else "—"
             )
-            st.dataframe(
+            show_table(
                 view[["item", "category", "qty", "paid", "cheapest", "save/unit"]],
                 use_container_width=True,
                 hide_index=True,
@@ -524,24 +561,24 @@ with tab_overview:
                     lambda r: f"${r['first_unit']:.2f} → ${r['last_unit']:.2f}", axis=1
                 )
                 rdf["change"] = rdf["pct"].map(lambda p: f"+{p:.1f}%")
-                st.dataframe(
+                show_table(
                     rdf[["item", "category", "was → now", "change"]],
                     use_container_width=True, hide_index=True,
                 )
 
         st.subheader("Spending by month")
         by_month = df.groupby("month")["line_total"].sum().sort_index()
-        st.bar_chart(by_month)
+        st.bar_chart(by_month, color="#1f8a4c")
 
         left, right = st.columns(2)
         with left:
             st.subheader("By store")
             by_store = df.groupby("store")["line_total"].sum().sort_values(ascending=False)
-            st.bar_chart(by_store)
+            st.bar_chart(by_store, color="#1f8a4c")
         with right:
             st.subheader("By category")
             by_cat = df.groupby("category")["line_total"].sum().sort_values(ascending=False)
-            st.bar_chart(by_cat)
+            st.bar_chart(by_cat, color="#56b37f")
 
 
 # --- Price History ---------------------------------------------------------
@@ -773,7 +810,7 @@ with tab_add:
             preview = pd.DataFrame([vars(i) for i in parsed.items])[
                 ["name", "category", "qty", "unit_price", "line_total", "upc"]
             ]
-            st.dataframe(preview, use_container_width=True, hide_index=True)
+            show_table(preview, use_container_width=True, hide_index=True)
 
             can_save = bool(save_date)
             if not can_save:
