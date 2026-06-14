@@ -5,6 +5,8 @@ Run with:  streamlit run app.py
 
 from __future__ import annotations
 
+import html
+
 import pandas as pd
 import streamlit as st
 
@@ -29,11 +31,20 @@ st.set_page_config(page_title="baskwise", page_icon="🧺", layout="wide")
 st.markdown(
     """
     <style>
-      :root { --bw-green:#1f8a4c; --bw-soft:#e8f6ee; --bw-border:#dfeae3; }
+      :root {
+        --bw-green:#1f8a4c; --bw-green-dark:#146536; --bw-soft:#e8f6ee;
+        --bw-border:#dfeae3; --bw-ink:#16241c; --bw-muted:#5b6b61;
+        --bw-surface:#ffffff; --bw-bg:#f6faf7;
+      }
+      .block-container {
+        max-width: 980px;
+        padding-top: 2.2rem;
+        padding-bottom: 3rem;
+      }
       /* Metrics as soft cards */
       [data-testid="stMetric"] {
         background: #f6faf7; border: 1px solid var(--bw-border);
-        border-radius: 16px; padding: 12px 14px;
+        border-radius: 18px; padding: 12px 14px;
       }
       [data-testid="stMetricValue"] {
         color: var(--bw-green); font-weight: 700; font-size: 1.85rem;
@@ -68,12 +79,134 @@ st.markdown(
         to   { opacity: 1; transform: none; }
       }
       section[data-testid="stSidebar"] { border-right: 1px solid var(--bw-border); }
+      .bw-app-hero {
+        border: 1px solid var(--bw-border);
+        border-radius: 28px;
+        background:
+          radial-gradient(420px 180px at 20% 0%, #dff4e8, transparent),
+          linear-gradient(145deg, #ffffff 0%, #f7fbf8 100%);
+        box-shadow: 0 18px 45px rgba(22, 101, 54, .10);
+        padding: 24px;
+        margin: 2px 0 22px;
+      }
+      .bw-hero-row { display: flex; align-items: center; justify-content: space-between; gap: 18px; }
+      .bw-brand { display: flex; align-items: center; gap: 13px; }
+      .bw-mark {
+        width: 56px; height: 56px; display: grid; place-items: center;
+        border-radius: 18px; background: #fff; border: 1px solid var(--bw-border);
+        box-shadow: 0 10px 25px rgba(31,138,76,.12); font-size: 30px;
+      }
+      .bw-title { font-size: 42px; line-height: 1; font-weight: 850; letter-spacing: -1px; color: var(--bw-ink); }
+      .bw-sub { margin: 16px 0 0; color: var(--bw-muted); font-size: 16px; max-width: 760px; }
+      .bw-pill {
+        display: inline-flex; align-items: center; gap: 7px; white-space: nowrap;
+        border: 1px solid var(--bw-border); background: var(--bw-soft);
+        color: var(--bw-green-dark); border-radius: 999px; padding: 9px 13px;
+        font-weight: 800; font-size: 13px;
+      }
+      .bw-opportunity-card, .bw-plan-card {
+        border: 1px solid var(--bw-border);
+        background: #fff;
+        border-radius: 22px;
+        padding: 16px;
+        box-shadow: 0 10px 24px rgba(22, 101, 54, .07);
+        margin: 10px 0 8px;
+      }
+      .bw-card-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+      .bw-card-title { font-size: 18px; font-weight: 850; color: var(--bw-ink); }
+      .bw-save-chip {
+        background: var(--bw-green); color: #fff; border-radius: 999px;
+        padding: 6px 10px; font-size: 13px; font-weight: 850; white-space: nowrap;
+      }
+      .bw-card-copy { margin-top: 9px; color: var(--bw-muted); font-size: 14px; }
+      .bw-route { margin-top: 12px; font-size: 15px; color: var(--bw-ink); }
+      .bw-route strong { color: var(--bw-green-dark); }
+      .bw-summary-grid {
+        display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 16px 0;
+      }
+      .bw-summary-card {
+        border: 1px solid var(--bw-border); border-radius: 20px; background: #fff;
+        padding: 15px; box-shadow: 0 8px 20px rgba(22,101,54,.06);
+      }
+      .bw-summary-label { color: var(--bw-muted); font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: .4px; }
+      .bw-summary-value { color: var(--bw-ink); font-size: 27px; line-height: 1.15; font-weight: 900; margin-top: 4px; }
+      .bw-summary-card.saving {
+        background: linear-gradient(145deg, var(--bw-green), var(--bw-green-dark));
+        color: #fff; border-color: transparent;
+      }
+      .bw-summary-card.saving .bw-summary-label,
+      .bw-summary-card.saving .bw-summary-value { color: #fff; }
+      .bw-plan-card h4 { margin: 0 0 5px; font-size: 18px; }
+      .bw-plan-place { color: var(--bw-muted); font-size: 13px; margin-bottom: 10px; }
+      .bw-plan-item {
+        display: flex; justify-content: space-between; gap: 10px;
+        border-top: 1px solid #edf3ef; padding: 8px 0; font-size: 14px;
+      }
+      .bw-plan-price { color: var(--bw-green-dark); font-weight: 850; white-space: nowrap; }
       /* Hide Streamlit dev chrome so it reads as a finished product, not a prototype */
       [data-testid="stToolbar"], [data-testid="stStatusWidget"],
       [data-testid="stAppDeployButton"], #MainMenu, [data-testid="stDecoration"] {
         display: none !important;
       }
       footer { visibility: hidden; height: 0; }
+      header[data-testid="stHeader"], [data-testid="stToolbar"],
+      [data-testid="stStatusWidget"], [data-testid="stMainMenu"],
+      [data-testid="stAppDeployButton"], [data-testid="stDecoration"],
+      #MainMenu {
+        display: none !important;
+        visibility: hidden !important;
+        height: 0 !important;
+      }
+      .stApp { padding-top: 0 !important; }
+      @media (max-width: 720px) {
+        .block-container {
+          padding: 1.1rem 1rem 6rem;
+          max-width: 430px;
+        }
+        .bw-app-hero {
+          margin-top: 0;
+          padding: 18px;
+          border-radius: 26px;
+          box-shadow: none;
+        }
+        .bw-hero-row { align-items: flex-start; }
+        .bw-title { font-size: 34px; letter-spacing: -.5px; }
+        .bw-mark { width: 50px; height: 50px; border-radius: 16px; }
+        .bw-pill { display: none; }
+        .bw-sub { font-size: 14px; line-height: 1.55; margin-top: 12px; }
+        [data-baseweb="tab-list"] {
+          flex-wrap: nowrap !important;
+          overflow-x: auto;
+          padding: 6px 0 10px;
+          gap: 8px;
+          scrollbar-width: none;
+        }
+        [data-baseweb="tab-list"]::-webkit-scrollbar { display: none; }
+        button[data-baseweb="tab"] {
+          min-width: max-content;
+          border: 1px solid var(--bw-border);
+          border-radius: 999px;
+          background: #fff;
+          padding: 8px 12px;
+        }
+        button[data-baseweb="tab"][aria-selected="true"] {
+          background: var(--bw-green);
+          color: #fff !important;
+          border-color: var(--bw-green);
+        }
+        button[data-baseweb="tab"] p { font-size: 13px; }
+        h2, h3 { line-height: 1.13; }
+        [data-testid="stMetric"] { border-radius: 18px; }
+        .bw-summary-grid { grid-template-columns: 1fr; gap: 10px; }
+        .bw-summary-card { padding: 14px 15px; }
+        .bw-summary-value { font-size: 25px; }
+        .bw-card-top { display: block; }
+        .bw-save-chip { display: inline-flex; margin-top: 9px; }
+        .stButton > button { min-height: 44px; }
+        section[data-testid="stSidebar"] {
+          box-shadow: 12px 0 30px rgba(22,101,54,.12);
+        }
+      }
     </style>
     """,
     unsafe_allow_html=True,
@@ -116,11 +249,23 @@ def refresh() -> None:
     load_items.clear()
 
 
+def esc(value) -> str:
+    return html.escape(str(value if value is not None else ""))
+
+
 def auth_ready() -> bool:
     """True if Google sign-in is configured (an [auth] section exists in secrets).
     Until then the app runs in open mode (one shared journal, no login)."""
     try:
         return "auth" in st.secrets
+    except Exception:
+        return False
+
+
+def admin_enabled() -> bool:
+    """Show destructive demo tools only when explicitly requested."""
+    try:
+        return st.query_params.get("admin") == "1"
     except Exception:
         return False
 
@@ -163,10 +308,23 @@ def show_table(df_in, **kwargs):
 
 added = ensure_seeded()
 
-st.title("🧺 baskwise")
-st.caption(
-    "Snap your receipts. We turn them into a price database and show you which "
-    "store is cheaper — so you save money on your next trip."
+st.markdown(
+    """
+    <section class="bw-app-hero">
+      <div class="bw-hero-row">
+        <div class="bw-brand">
+          <div class="bw-mark">🧺</div>
+          <div class="bw-title">baskwise</div>
+        </div>
+        <div class="bw-pill">Demo · Dallas prices</div>
+      </div>
+      <p class="bw-sub">
+        Snap a receipt, compare nearby stores, and get a simple shopping plan
+        that shows exactly where your grocery money goes further.
+      </p>
+    </section>
+    """,
+    unsafe_allow_html=True,
 )
 if added:
     st.success(f"Loaded {added} sample receipts to get you started.")
@@ -187,17 +345,20 @@ with st.sidebar:
         if me:
             st.success(f"👤 **{me}**")
             st.caption("Receipts you add are saved to your private journal.")
-            if st.button("Sign out", use_container_width=True):
+            if st.button("Sign out", width="stretch"):
                 st.logout()
         else:
             st.caption(
                 "👋 **Sign in** to keep your own private journal — your receipts "
                 "stay yours, and still help the community price database."
             )
-            if st.button("🔑 Sign in with Google", type="primary", use_container_width=True):
+            if st.button("🔑 Sign in with Google", type="primary", width="stretch"):
                 st.login("google")
     else:
-        st.caption("👀 Exploring the **demo** — sample community prices, no account needed.")
+        st.caption(
+            "🧪 **Demo mode:** sample Dallas-area prices, no account needed. "
+            "Try the savings tools, then add your own receipt when you're ready."
+        )
     st.divider()
 
 # --- home location (powers all "near you" comparisons) ---------------------
@@ -211,7 +372,7 @@ if not community.empty:
         default_zip = str(by_zip["zip"].value_counts().idxmax())
 
 st.sidebar.header("📍 Your location")
-st.sidebar.caption("Enter your ZIP — we'll fill in your city and find deals near you.")
+st.sidebar.caption("Demo starts in Dallas. Enter your ZIP to see savings near you.")
 zip_in = geo.clean_zip(st.sidebar.text_input("Your ZIP code", value=default_zip, max_chars=5))
 if len(zip_in) == 5:
     place = resolve_zip(zip_in)
@@ -235,8 +396,11 @@ with st.sidebar:
             "shows you where to shop to save — built around real shoppers, not "
             "retailer ads."
         )
-        st.link_button("🌐 baskwise.com", "https://baskwise.com", use_container_width=True)
-        st.link_button("📱 Open the app", "https://baskwise.app", use_container_width=True)
+        st.caption(
+            "Privacy promise: baskwise reads item, price, store and date. "
+            "No card numbers or personal details are needed."
+        )
+        st.link_button("🌐 Join early access", "https://baskwise.com/#get", width="stretch")
 
 if df.empty:
     st.info(
@@ -269,14 +433,27 @@ with tab_savings:
                 "Tap **🔔 Watch** to get alerted if the price climbs."
             )
             for o in opps:
-                txt_col, btn_col = st.columns([6, 1])
-                txt_col.markdown(
-                    f"**{o['item']}** — you pay \\${o['your_unit']:.2f} at "
-                    f"{o['your_store']}, but it's **\\${o['best_unit']:.2f} at "
-                    f"{o['best_store']}** ({o['best_place']}) → "
-                    f"**save \\${o['savings']:.2f}/unit**"
+                st.markdown(
+                    f"""
+                    <div class="bw-opportunity-card">
+                      <div class="bw-card-top">
+                        <div class="bw-card-title">{esc(o['item'])}</div>
+                        <div class="bw-save-chip">Save ${o['savings']:.2f}/unit</div>
+                      </div>
+                      <div class="bw-card-copy">
+                        You usually pay <strong>${o['your_unit']:.2f}</strong> at
+                        {esc(o['your_store'])}.
+                      </div>
+                      <div class="bw-route">
+                        Best nearby: <strong>${o['best_unit']:.2f}</strong> at
+                        <strong>{esc(o['best_store'])}</strong>
+                        <span>{esc(o['best_place'])}</span>
+                      </div>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
                 )
-                if btn_col.button("🔔 Watch", key=f"watchopp_{o['norm_key']}"):
+                if st.button("🔔 Watch this price", key=f"watchopp_{o['norm_key']}", width="stretch"):
                     with db.session() as conn:
                         db.add_watch(
                             conn, norm_key=o["norm_key"], label=o["item"],
@@ -309,20 +486,37 @@ with tab_savings:
              + (f"  ·  save ${s:.2f}" if s > 0.001 else "")): rid
             for rid, store, d, s in scored
         }
-        choice = st.selectbox("Receipt to analyze", list(label_to_id.keys()))
+        receipt_labels = list(label_to_id.keys())
+        choice = st.selectbox(
+            "Try a sample receipt",
+            receipt_labels,
+            index=0,
+            key="receipt_to_analyze_demo_v2",
+            help="The demo starts with the receipt that shows the biggest savings opportunity.",
+        )
         # your receipt, priced against the community pool
         result = analyze_receipt(
             community, label_to_id[choice], home_zip, home_state, home_city
         )
 
-        c1, c2, c3 = st.columns(3)
-        c1.metric("You paid", f"${result['paid_total']:.2f}")
-        c2.metric("Cheapest possible", f"${result['optimized_total']:.2f}")
-        c3.metric(
-            "Potential savings",
-            f"${result['savings']:.2f}",
-            delta=f"-{result['savings']:.2f}" if result["savings"] > 0 else "0.00",
-            delta_color="inverse",
+        st.markdown(
+            f"""
+            <div class="bw-summary-grid">
+              <div class="bw-summary-card">
+                <div class="bw-summary-label">You paid</div>
+                <div class="bw-summary-value">${result['paid_total']:.2f}</div>
+              </div>
+              <div class="bw-summary-card">
+                <div class="bw-summary-label">Best local mix</div>
+                <div class="bw-summary-value">${result['optimized_total']:.2f}</div>
+              </div>
+              <div class="bw-summary-card saving">
+                <div class="bw-summary-label">You save</div>
+                <div class="bw-summary-value">${result['savings']:.2f}</div>
+              </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
         )
 
         if result["savings"] > 0.001:
@@ -333,7 +527,8 @@ with tab_savings:
         else:
             st.info(
                 f"Nice — **{result['receipt_store']}** was already the cheapest option "
-                "near you for everything on this receipt (based on current data)."
+                "near you for everything on this receipt. Try another sample receipt "
+                "above to see a savings breakdown."
             )
 
         rows = pd.DataFrame(result["rows"])
@@ -354,7 +549,7 @@ with tab_savings:
             )
             show_table(
                 view[["item", "category", "qty", "paid", "cheapest", "save/unit"]],
-                use_container_width=True,
+                width="stretch",
                 hide_index=True,
             )
 
@@ -365,18 +560,23 @@ with tab_savings:
                 plan = {}
                 for _, r in rows.iterrows():
                     plan.setdefault(r["best_store"], {"place": r["best_place"], "items": []})
-                    plan[r["best_store"]]["items"].append(
-                        f"{r['item']} (${r['best_unit']:.2f})"
+                    plan[r["best_store"]]["items"].append((r["item"], float(r["best_unit"])))
+                for store, info in plan.items():
+                    items_html = "".join(
+                        f"<div class='bw-plan-item'><span>{esc(name)}</span>"
+                        f"<span class='bw-plan-price'>${price:.2f}</span></div>"
+                        for name, price in info["items"]
                     )
-                cols = st.columns(len(plan))
-                for col, (store, info) in zip(cols, plan.items()):
-                    with col:
-                        header = f"**{store}**"
-                        if info["place"]:
-                            header += f"  \n_{info['place']}_"
-                        st.markdown(header)
-                        for line in info["items"]:
-                            st.markdown(f"- {line}")
+                    st.markdown(
+                        f"""
+                        <div class="bw-plan-card">
+                          <h4>{esc(store)}</h4>
+                          <div class="bw-plan-place">{esc(info["place"])}</div>
+                          {items_html}
+                        </div>
+                        """,
+                        unsafe_allow_html=True,
+                    )
 
 
 # --- Alerts ----------------------------------------------------------------
@@ -470,7 +670,7 @@ with tab_upc:
         st.caption("Quick pick a product:")
         cols = st.columns(len(examples))
         for col, (code, name) in zip(cols, examples.items()):
-            if col.button(name, key=f"upcpick_{code}", use_container_width=True):
+            if col.button(name, key=f"upcpick_{code}", width="stretch"):
                 st.session_state["upc_choice"] = code
 
     typed = st.text_input("…or type/scan any UPC", placeholder="e.g. 3017620422003")
@@ -557,7 +757,7 @@ with tab_upc:
             show["unit_price"] = show["unit_price"].map("${:.2f}".format)
             show["purchased_on"] = show["purchased_on"].map(freshness_label)
             show.columns = ["Store", "Location", "Distance", "Latest price", "Freshness"]
-            st.dataframe(show, use_container_width=True, hide_index=True)
+            st.dataframe(show, width="stretch", hide_index=True)
             st.caption(
                 "Prices are the **freshest the community has reported**, with their age. "
                 "🟢 fresh (≤2 wks) · 🟡 aging · 🔴 stale (>6 wks). They get more "
@@ -628,7 +828,7 @@ with tab_overview:
                 rdf["change"] = rdf["pct"].map(lambda p: f"+{p:.1f}%")
                 show_table(
                     rdf[["item", "category", "was → now", "change"]],
-                    use_container_width=True, hide_index=True,
+                    width="stretch", hide_index=True,
                 )
 
         st.subheader("Spending by month")
@@ -690,7 +890,7 @@ with tab_prices:
             item_df[["purchased_on", "store", "unit_price", "qty", "line_total"]]
             .rename(columns={"purchased_on": "date"})
             .reset_index(drop=True),
-            use_container_width=True,
+            width="stretch",
         )
 
 
@@ -726,7 +926,7 @@ with tab_basket:
             table = latest.pivot_table(
                 index="name", columns="store", values="unit_price", aggfunc="mean"
             )
-            st.dataframe(table.style.format("${:.2f}"), use_container_width=True)
+            st.dataframe(table.style.format("${:.2f}"), width="stretch")
 
             totals = table.sum(min_count=1)
             coverage = table.notna().sum()
@@ -740,7 +940,7 @@ with tab_basket:
             st.subheader("Basket totals by store")
             st.dataframe(
                 summary.style.format({"Basket total": "${:.2f}"}),
-                use_container_width=True,
+                width="stretch",
             )
 
             full = totals.dropna()
@@ -878,7 +1078,7 @@ with tab_add:
             preview = pd.DataFrame([vars(i) for i in parsed.items])[
                 ["name", "category", "qty", "unit_price", "line_total", "upc"]
             ]
-            show_table(preview, use_container_width=True, hide_index=True)
+            show_table(preview, width="stretch", hide_index=True)
 
             can_save = bool(save_date)
             if not can_save:
@@ -917,18 +1117,19 @@ with tab_add:
                 "to fix any misreads, or try a clearer picture."
             )
 
-    with st.expander("⚙️ Admin"):
-        st.caption("Reset wipes all data and reloads the bundled samples.")
-        if st.button("Reset to sample data"):
-            db.reset_db()
-            ensure_seeded()
-            refresh()
-            st.success("Database reset to sample data.")
-            st.rerun()
+    if admin_enabled():
+        with st.expander("⚙️ Admin"):
+            st.caption("Reset wipes all data and reloads the bundled samples.")
+            if st.button("Reset to sample data"):
+                db.reset_db()
+                ensure_seeded()
+                refresh()
+                st.success("Database reset to sample data.")
+                st.rerun()
 
 
 # --- Footer (renders once, below the tabs) ---------------------------------
 st.divider()
 fcol1, fcol2 = st.columns([3, 1])
 fcol1.caption("🧺 **baskwise** — save smarter, every trip.")
-fcol2.link_button("📱 Open baskwise.app", "https://baskwise.app", use_container_width=True)
+fcol2.link_button("🌐 Join early access", "https://baskwise.com/#get", width="stretch")
